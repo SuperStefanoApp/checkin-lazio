@@ -1,0 +1,73 @@
+<!doctype html>
+<html lang="it">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="theme-color" content="#123b5d">
+<link rel="manifest" href="/manifest.json">
+<title>CheckIn Lazio</title>
+<style>
+:root{font-family:system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;color:#163047;background:#f4f7fa}
+*{box-sizing:border-box}body{margin:0}.top{background:#123b5d;color:#fff;padding:18px 20px;position:sticky;top:0;z-index:5}.top h1{margin:0;font-size:22px}.wrap{max-width:900px;margin:0 auto;padding:18px}.card{background:#fff;border-radius:16px;padding:18px;margin-bottom:16px;box-shadow:0 2px 12px #00000012}.grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px}@media(max-width:650px){.grid{grid-template-columns:1fr}}label{font-weight:600;font-size:13px;display:block;margin-bottom:6px}input,button,select{width:100%;padding:12px;border:1px solid #ccd6df;border-radius:10px;font-size:16px}button{background:#123b5d;color:#fff;border:0;font-weight:700;cursor:pointer}.secondary{background:#e9eef3;color:#123b5d}.danger{background:#a62929}.guest{border:1px solid #dce4eb;border-radius:12px;padding:14px;margin:12px 0}.row{display:flex;gap:10px;align-items:center}.row>*{flex:1}.status{padding:10px;border-radius:10px;background:#eef5fa;margin-top:12px}.small{font-size:12px;color:#617487}.hidden{display:none}.pill{display:inline-block;padding:5px 9px;border-radius:999px;background:#e9eef3;font-size:12px}
+</style>
+</head>
+<body>
+<div class="top"><h1>CheckIn Lazio</h1><div class="small" style="color:#d9e7f2">Check-in online • Alloggiati Web • ROSS 1000</div></div>
+<div class="wrap">
+<section id="login" class="card">
+<h2>Accesso</h2>
+<div class="grid"><div><label>Utente</label><input id="user" autocomplete="username"></div><div><label>Password</label><input id="pass" type="password" autocomplete="current-password"></div></div>
+<button style="margin-top:12px" onclick="login()">Accedi</button><div id="loginMsg" class="status hidden"></div>
+</section>
+
+<section id="app" class="hidden">
+<div class="card">
+<h2>Nuovo check-in</h2>
+<div class="grid">
+<div><label>Arrivo</label><input id="arrival" type="date"></div>
+<div><label>Notti</label><input id="nights" type="number" min="1" value="1" onchange="calcDeparture()"></div>
+<div><label>Partenza</label><input id="departure" type="date" readonly></div>
+<div><label>Numero ospiti</label><input id="party" type="number" min="1" value="1" onchange="syncGuests()"></div>
+</div>
+<div id="guests"></div>
+<div class="row" style="margin-top:10px"><button class="secondary" onclick="addManual()">+ Inserisci manualmente</button><button onclick="saveStay()">Salva check-in</button></div>
+<div id="saveMsg" class="status hidden"></div>
+</div>
+
+<div class="card">
+<h2>Documento</h2>
+<p class="small">Sul telefono puoi usare la fotocamera. L'immagine viene elaborata nel browser per leggere MRZ/OCR e poi i dati restano modificabili prima del salvataggio.</p>
+<input id="doc" type="file" accept="image/*" capture="environment" onchange="scanDoc()">
+<div id="ocrMsg" class="status hidden"></div>
+</div>
+
+<div class="card">
+<h2>Trasmissioni</h2>
+<div class="row"><button onclick="testService('alloggiati')">Test Alloggiati</button><button onclick="showHistory()">Storico</button></div>
+<div id="serviceMsg" class="status hidden"></div>
+</div>
+
+<div class="card">
+<h2>Installazione sul telefono</h2>
+<p class="small">Da Safari/Chrome puoi aggiungere questa pagina alla schermata Home. La stessa applicazione può essere usata da più dispositivi, perché il database è sul server.</p>
+</div>
+</section>
+</div>
+<script>
+let token=localStorage.getItem("checkin_token")||"";
+function api(path,opt={}){opt.headers={...(opt.headers||{}),Authorization:"Bearer "+token,"Content-Type":"application/json"};return fetch(path,opt)}
+function show(id,msg){const e=document.getElementById(id);e.textContent=msg;e.classList.remove("hidden")}
+async function login(){const r=await fetch("/api/login",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({username:user.value,password:pass.value})});const j=await r.json();if(j.ok){token=j.token;localStorage.setItem("checkin_token",token);document.getElementById("login").classList.add("hidden");document.getElementById("app").classList.remove("hidden");syncGuests();calcDeparture()}else show("loginMsg",j.error||"Accesso negato")}
+function calcDeparture(){if(!arrival.value)return;const d=new Date(arrival.value+"T00:00:00");d.setDate(d.getDate()+Number(nights.value||1));departure.value=d.toISOString().slice(0,10)}
+function guestHtml(i){return `<div class="guest"><div class="pill">Ospite ${i}</div><div class="grid" style="margin-top:10px"><div><label>Nome</label><input data-f="nome"></div><div><label>Cognome</label><input data-f="cognome"></div><div><label>Data di nascita</label><input data-f="nascita" type="date"></div><div><label>Luogo di nascita</label><input data-f="luogo_nascita"></div><div><label>Sesso</label><select data-f="sesso"><option value="">Seleziona</option><option>M</option><option>F</option></select></div><div><label>Cittadinanza</label><input data-f="cittadinanza"></div><div><label>Tipo documento</label><input data-f="tipo_documento" placeholder="Carta identità / Passaporto"></div><div><label>Numero documento</label><input data-f="numero_documento"></div><div><label>Stato rilascio</label><input data-f="stato_documento"></div><div><label>Data arrivo</label><input data-f="arrivo" type="date"></div></div></div>`}
+function syncGuests(){let n=Math.max(1,Number(party.value||1));guests.innerHTML=Array.from({length:n},(_,i)=>guestHtml(i+1)).join("")}
+function addManual(){party.value=Number(party.value||0)+1;syncGuests();guests.lastElementChild?.scrollIntoView({behavior:"smooth"})}
+function collectGuests(){return [...document.querySelectorAll(".guest")].map(g=>Object.fromEntries([...g.querySelectorAll("[data-f]")].map(x=>[x.dataset.f,x.value])))}
+async function saveStay(){calcDeparture();const gs=collectGuests();const r=await api("/api/stays",{method:"POST",body:JSON.stringify({arrival:arrival.value,nights:Number(nights.value),departure:departure.value,guests:gs})});const j=await r.json();show("saveMsg",j.ok?`Check-in salvato. ID ${j.id}`:(j.error||"Errore"))}
+async function testService(s){const r=await api("/api/test/"+s,{method:"POST"});const j=await r.json();show("serviceMsg",j.ok?j.message:(j.error||"Test non riuscito"))}
+async function scanDoc(){show("ocrMsg","Elaborazione documento…");try{const f=doc.files[0];if(!f) return;show("ocrMsg","Documento acquisito. OCR/MRZ pronto per l'integrazione del motore di riconoscimento.");}catch(e){show("ocrMsg","Errore lettura documento")}}
+function showHistory(){api("/api/stays").then(r=>r.json()).then(rows=>show("serviceMsg",`Storico: ${rows.length} soggiorni presenti.`))}
+document.getElementById("arrival").addEventListener("change",calcDeparture);
+if(token){document.getElementById("login").classList.add("hidden");document.getElementById("app").classList.remove("hidden");syncGuests();calcDeparture()}
+</script>
+</body></html>

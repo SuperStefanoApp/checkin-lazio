@@ -1,0 +1,32 @@
+services:
+  - type: web
+    name: checkin-lazio
+    runtime: docker
+    plan: starter
+    autoDeploy: true
+    healthCheckPath: /api/health
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: PORT
+        value: 3000
+      - key: ADMIN_USER
+        sync: false
+      - key: ADMIN_PASSWORD
+        sync: false
+      - key: SESSION_SECRET
+        generateValue: true
+      - key: ALLOGGIATI_USER
+        sync: false
+      - key: ALLOGGIATI_PASSWORD
+        sync: false
+      - key: ALLOGGIATI_WSKEY
+        sync: false
+      - key: ROSS_USER
+        sync: false
+      - key: ROSS_PASSWORD
+        sync: false
+      - key: ROSS_STRUCTURE_CODE
+        sync: false
+      - key: ROSS_ENDPOINT
+        value: https://lazioturismo.ross1000.it/ws/checkinV2
