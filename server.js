@@ -133,6 +133,6 @@ app.get("/api/submissions",(req,res)=>{
   res.json(db.prepare("SELECT * FROM submissions ORDER BY id DESC LIMIT 200").all());
 });
 
-app.get("*",(req,res)=>res.sendFile(path.join(__dirname,"public","index.html")));
+app.get("/{*splat}",(req,res)=>res.sendFile(path.join(__dirname,"public","index.html")));
 
 app.listen(PORT,()=>console.log(`CheckIn Lazio cloud server on :${PORT}`));
