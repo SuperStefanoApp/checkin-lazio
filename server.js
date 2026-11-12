@@ -32,8 +32,6 @@ app.use(express.json({limit:"10mb"}));
 app.use(express.static(path.join(__dirname,"public")));
 
 function auth(req,res,next){
-  // When mounted with app.use("/api", auth), Express exposes req.path without
-  // the mount prefix. Use originalUrl so the public routes are unambiguous.
   const publicUrl = req.originalUrl.split("?")[0];
   if(publicUrl === "/api/health" || publicUrl === "/api/login") return next();
   const h = req.headers.authorization || "";
@@ -44,98 +42,187 @@ function auth(req,res,next){
     const [a,b] = token.split(".");
     const expected = crypto.createHmac("sha256", process.env.SESSION_SECRET).update(a).digest("hex");
     if(!b || !crypto.timingSafeEqual(Buffer.from(b),Buffer.from(expected))) throw new Error();
-    req.user = a;
-    next();
+    req.user = a; next();
   } catch { return res.status(401).json({error:"AUTH_INVALID"}); }
 }
 app.use("/api", auth);
 
 app.get("/api/health",(req,res)=>res.json({ok:true,service:"checkin-lazio",time:new Date().toISOString()}));
-
 app.post("/api/login",(req,res)=>{
   const {username,password}=req.body||{};
   if(username===process.env.ADMIN_USER && password===process.env.ADMIN_PASSWORD){
-    const a = crypto.randomUUID();
-    const b = crypto.createHmac("sha256",process.env.SESSION_SECRET).update(a).digest("hex");
+    const a=crypto.randomUUID();
+    const b=crypto.createHmac("sha256",process.env.SESSION_SECRET).update(a).digest("hex");
     return res.json({ok:true,token:`${a}.${b}`});
   }
-  return res.status(401).json({ok:false,error:"Credenziali non valide"});
+  res.status(401).json({ok:false,error:"Credenziali non valide"});
 });
 
 app.post("/api/stays",(req,res)=>{
   const {arrival,nights,departure,guests}=req.body||{};
-  if(!arrival || !departure || !Number.isInteger(Number(nights)) || Number(nights)<1 || !Array.isArray(guests) || guests.length<1)
-    return res.status(400).json({error:"DATI_INCOMPLETI"});
-  const stmt=db.prepare("INSERT INTO stays(arrival,nights,departure,guests_json,created_at) VALUES(?,?,?,?,?)");
-  const info=stmt.run(arrival,Number(nights),departure,JSON.stringify(guests),new Date().toISOString());
+  if(!arrival||!departure||!Number.isInteger(Number(nights))||Number(nights)<1||Number(nights)>30||!Array.isArray(guests)||guests.length<1)
+    return res.status(400).json({error:"DATI_INCOMPLETI_O_NUOVI_LIMITI"});
+  const info=db.prepare("INSERT INTO stays(arrival,nights,departure,guests_json,created_at) VALUES(?,?,?,?,?)")
+    .run(arrival,Number(nights),departure,JSON.stringify(guests),new Date().toISOString());
   res.json({ok:true,id:info.lastInsertRowid});
 });
-
 app.get("/api/stays",(req,res)=>{
   const rows=db.prepare("SELECT * FROM stays ORDER BY id DESC LIMIT 100").all();
   res.json(rows.map(r=>({...r,guests:JSON.parse(r.guests_json)})));
 });
+app.get("/api/submissions",(req,res)=>res.json(db.prepare("SELECT * FROM submissions ORDER BY id DESC LIMIT 200").all()));
 
 function xmlEscape(s=""){return String(s).replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/"/g,"&quot;").replace(/'/g,"&apos;");}
+function tag(text,name){const re=new RegExp(`<${name}(?:\\s[^>]*)?>([\\s\\S]*?)</${name}>`,`i`);return (text.match(re)||[])[1]||"";}
+function allTags(text,name){const re=new RegExp(`<${name}(?:\\s[^>]*)?>([\\s\\S]*?)</${name}>`,`gi`);return [...text.matchAll(re)].map(m=>m[1]);}
+function isoToDMY(v){const [y,m,d]=String(v||"").split("-");return y&&m&&d?`${d}/${m}/${y}`:"";}
+function yyyymmdd(v){const [y,m,d]=String(v||"").split("-");return y&&m&&d?`${y}${m}${d}`:"";}
+function norm(s){return String(s||"").normalize("NFD").replace(/[\u0300-\u036f]/g,"").toUpperCase().replace(/[^A-Z0-9]+/g," ").trim();}
 
-function guestToSchedina(g,stay){
-  // The exact 168-char Alloggiati record layout must be mapped to the structure's
-  // official tabella/field codes before production sending. This function deliberately
-  // refuses to transmit an unverified record instead of inventing a format.
-  return null;
-}
-
-async function alloggiatiGenerateToken(){
+async function soapCall(action, body){
   const endpoint="https://alloggiatiweb.poliziadistato.it/service/Service.asmx";
-  const body=`<?xml version="1.0" encoding="utf-8"?>
-<soap:Envelope xmlns:soap="http://www.w3.org/2003/05/soap-envelope" xmlns:all="AlloggiatiService">
-<soap:Body><all:GenerateToken>
-<all:Utente>${xmlEscape(process.env.ALLOGGIATI_USER)}</all:Utente>
-<all:Password>${xmlEscape(process.env.ALLOGGIATI_PASSWORD)}</all:Password>
-<all:WsKey>${xmlEscape(process.env.ALLOGGIATI_WSKEY)}</all:WsKey>
-</all:GenerateToken></soap:Body></soap:Envelope>`;
-  const r=await fetch(endpoint,{method:"POST",headers:{"Content-Type":"application/soap+xml; charset=utf-8","SOAPAction":"AlloggiatiService/GenerateToken"},body});
+  const envelope=`<?xml version="1.0" encoding="utf-8"?><soap:Envelope xmlns:soap="http://www.w3.org/2003/05/soap-envelope" xmlns:all="AlloggiatiService"><soap:Header/><soap:Body>${body}</soap:Body></soap:Envelope>`;
+  const r=await fetch(endpoint,{method:"POST",headers:{"Content-Type":"application/soap+xml; charset=utf-8","SOAPAction":`AlloggiatiService/${action}`},body:envelope});
   const text=await r.text();
-  const token=(text.match(/<token>(.*?)<\/token>/)||[])[1]||"";
-  const err=(text.match(/<ErroreDettaglio>(.*?)<\/ErroreDettaglio>/)||[])[1]||"";
-  if(!token) throw new Error(err||"GenerateToken non ha restituito un token");
+  if(!r.ok) throw new Error(`Alloggiati HTTP ${r.status}: ${text.slice(0,500)}`);
+  return text;
+}
+async function alloggiatiGenerateToken(){
+  if(!process.env.ALLOGGIATI_USER||!process.env.ALLOGGIATI_PASSWORD||!process.env.ALLOGGIATI_WSKEY) throw new Error("Credenziali Alloggiati non configurate");
+  const text=await soapCall("GenerateToken",`<all:GenerateToken><all:Utente>${xmlEscape(process.env.ALLOGGIATI_USER)}</all:Utente><all:Password>${xmlEscape(process.env.ALLOGGIATI_PASSWORD)}</all:Password><all:WsKey>${xmlEscape(process.env.ALLOGGIATI_WSKEY)}</all:WsKey></all:GenerateToken>`);
+  const token=tag(text,"token");
+  if(!token) throw new Error(tag(text,"ErroreDettaglio")||tag(text,"ErroreDes")||"GenerateToken non ha restituito un token");
   return token;
+}
+async function alloggiatiTable(token,tipo){
+  const text=await soapCall("Tabella",`<all:Tabella><all:Utente>${xmlEscape(process.env.ALLOGGIATI_USER)}</all:Utente><all:token>${xmlEscape(token)}</all:token><all:tipo>${tipo}</all:tipo></all:Tabella>`);
+  const csv=tag(text,"CSV");
+  if(!csv) throw new Error(`Tabella ${tipo} non disponibile: ${tag(text,"ErroreDettaglio")||tag(text,"ErroreDes")||"errore sconosciuto"}`);
+  return csv;
+}
+function csvRows(csv){return String(csv||"").trim().split(/\r?\n/).map(line=>line.split(";"));}
+function findCode(csv, wanted){
+  const w=norm(wanted);
+  if(!w) return "";
+  for(const row of csvRows(csv).slice(1)){
+    if(row.some(cell=>norm(cell)===w)) return String(row[0]||"").trim();
+  }
+  for(const row of csvRows(csv).slice(1)){
+    if(row.some(cell=>norm(cell).includes(w))) return String(row[0]||"").trim();
+  }
+  return "";
+}
+function findDocCode(csv, wanted){
+  const w=norm(wanted);
+  if(!w) return "";
+  const aliases={
+    "CARTA IDENTITA":"CARTA IDENTITA",
+    "CARTA D IDENTITA":"CARTA IDENTITA",
+    "CARTA IDENTITA ELETTRONICA":"CARTA IDENTITA ELETTRONICA",
+    "PASSAPORTO":"PASSAPORTO"
+  };
+  const target=aliases[w]||w;
+  for(const row of csvRows(csv).slice(1)){
+    if(row.slice(1).some(cell=>norm(cell)===target)) return String(row[0]||"").trim();
+  }
+  for(const row of csvRows(csv).slice(1)){
+    if(row.slice(1).some(cell=>norm(cell).includes(target))) return String(row[0]||"").trim();
+  }
+  return "";
+}
+function fixed(v,n){return String(v||"").normalize("NFD").replace(/[\u0300-\u036f]/g,"").replace(/[^A-Za-z0-9 /'\-]/g,"").slice(0,n).padEnd(n," ");}
+
+async function buildAlloggiatiRecords(stay){
+  const token=await alloggiatiGenerateToken();
+  const luoghi=await alloggiatiTable(token,"Luoghi");
+  const docs=await alloggiatiTable(token,"Tipi_Documento");
+  const types=await alloggiatiTable(token,"Tipi_Alloggiato");
+  const type16=findCode(types,"Ospite Singolo")||"16";
+  const records=[];
+  const problems=[];
+  for(let i=0;i<stay.guests.length;i++){
+    const g=stay.guests[i]||{};
+    const birthState=countryToFull(g.stato_nascita||g.stato_documento||g.cittadinanza);
+    const birthStateCode=findCode(luoghi,birthState||g.cittadinanza);
+    const nationalityCode=findCode(luoghi,g.cittadinanza);
+    const birthPlaceCode=findCode(luoghi,g.luogo_nascita);
+    const docCode=findDocCode(docs,g.tipo_documento||"Carta identità");
+    const releaseCode=findCode(luoghi,g.stato_documento||g.luogo_rilascio||g.cittadinanza);
+    const sesso=g.sesso==="M"?"1":g.sesso==="F"?"2":"";
+    if(!g.cognome||!g.nome||!g.nascita||!sesso||!nationalityCode||!birthStateCode||!docCode||!g.numero_documento||!releaseCode){
+      problems.push(`Ospite ${i+1}: dati/codici mancanti (controlla nascita, cittadinanza, sesso, documento e luogo rilascio).`); continue;
+    }
+    if(birthStateCode==="100000100"&&!birthPlaceCode) problems.push(`Ospite ${i+1}: luogo di nascita "${g.luogo_nascita}" non trovato nella tabella Alloggiati.`);
+    const line = fixed(type16,2)+fixed(isoToDMY(stay.arrival),10)+fixed(String(stay.nights).padStart(2,"0"),2)+fixed(g.cognome,50)+fixed(g.nome,30)+fixed(sesso,1)+fixed(isoToDMY(g.nascita),10)+fixed(birthStateCode==="100000100"?birthPlaceCode:"",9)+fixed(birthStateCode==="100000100"?(g.provincia_nascita||""):"",2)+fixed(birthStateCode,9)+fixed(nationalityCode,9)+fixed(docCode,5)+fixed(g.numero_documento,20)+fixed(releaseCode,9);
+    if(line.length!==168) problems.push(`Ospite ${i+1}: record generato di ${line.length} caratteri invece di 168.`); else records.push(line);
+  }
+  if(problems.length) throw new Error(problems.join(" | "));
+  return {token,records};
+}
+function countryToFull(v){
+  const m={ITA:"Italia",Italy:"Italia",Italia:"Italia",FRA:"Francia",France:"Francia",DEU:"Germania",Germany:"Germania",ESP:"Spagna",Spain:"Spagna",GBR:"Regno Unito",UK:"Regno Unito",USA:"Stati Uniti",US:"Stati Uniti",CHE:"Svizzera",Switzerland:"Svizzera",AUT:"Austria",NLD:"Paesi Bassi",BEL:"Belgio",PRT:"Portogallo",POL:"Polonia",ROU:"Romania",BRA:"Brasile",CAN:"Canada",ARG:"Argentina",CHN:"Cina",JPN:"Giappone",IND:"India",ALB:"Albania",HRV:"Croazia",SVN:"Slovenia",SVK:"Slovacchia",CZE:"Cechia",HUN:"Ungheria",BGR:"Bulgaria",SRB:"Serbia",UKR:"Ucraina",RUS:"Russia",MAR:"Marocco",TUR:"Turchia",EGY:"Egitto"};
+  return m[String(v||"").trim()]||String(v||"").trim();
+}
+async function alloggiatiSend(stay){
+  const {token,records}=await buildAlloggiatiRecords(stay);
+  const inner=records.map(x=>`<all:string>${xmlEscape(x)}</all:string>`).join("");
+  const text=await soapCall("Send",`<all:Send><all:Utente>${xmlEscape(process.env.ALLOGGIATI_USER)}</all:Utente><all:token>${xmlEscape(token)}</all:token><all:ElencoSchedine>${inner}</all:ElencoSchedine></all:Send>`);
+  const valid=Number(tag(text,"SchedineValide")||0);
+  const detail=allTags(text,"EsitoOperazioneServizio").map(x=>({esito:tag(x,"esito"),codice:tag(x,"ErroreCod"),descrizione:tag(x,"ErroreDes"),dettaglio:tag(x,"ErroreDettaglio")}));
+  const general={esito:tag(text,"SendResult")?tag(tag(text,"SendResult"),"esito"):"",errore:tag(tag(text,"SendResult"),"ErroreDettaglio")};
+  return {ok:valid===records.length,status:valid===records.length?"sent":"partial",valid,total:records.length,detail,general};
 }
 
 app.post("/api/test/alloggiati",async(req,res)=>{
-  try{
-    if(!process.env.ALLOGGIATI_USER||!process.env.ALLOGGIATI_PASSWORD||!process.env.ALLOGGIATI_WSKEY)
-      return res.status(400).json({ok:false,error:"Credenziali Alloggiati non configurate"});
-    const token=await alloggiatiGenerateToken();
-    res.json({ok:true,message:"GenerateToken riuscito",token_valid:true});
-  }catch(e){res.status(502).json({ok:false,error:String(e.message||e)})}
+  try{const token=await alloggiatiGenerateToken();res.json({ok:true,message:"GenerateToken riuscito",token_valid:true});}
+  catch(e){res.status(502).json({ok:false,error:String(e.message||e)})}
 });
-
 app.post("/api/submit/:service/:stayId",async(req,res)=>{
   const service=req.params.service;
-  const stay=db.prepare("SELECT * FROM stays WHERE id=?").get(req.params.stayId);
-  if(!stay) return res.status(404).json({error:"SOGGIORNO_NON_TROVATO"});
-  if(service==="alloggiati"){
-    // Production sending is intentionally gated until the exact structure field map
-    // is entered in configuration. The official WS is reachable/testable via GenerateToken.
-    const detail="Invio dati non eseguito: manca la mappatura verificata dei campi Alloggiati della struttura.";
-    db.prepare("INSERT INTO submissions(stay_id,service,status,detail,created_at) VALUES(?,?,?,?,?)")
-      .run(stay.id,service,"blocked",detail,new Date().toISOString());
-    return res.json({ok:false,status:"blocked",detail});
+  const row=db.prepare("SELECT * FROM stays WHERE id=?").get(req.params.stayId);
+  if(!row) return res.status(404).json({error:"SOGGIORNO_NON_TROVATO"});
+  const stay={...row,guests:JSON.parse(row.guests_json)};
+  try{
+    if(service==="alloggiati"){
+      const result=await alloggiatiSend(stay);
+      const detail=JSON.stringify(result);
+      db.prepare("INSERT INTO submissions(stay_id,service,status,detail,created_at) VALUES(?,?,?,?,?)").run(row.id,service,result.status,detail,new Date().toISOString());
+      return res.json(result);
+    }
+    if(service==="ross1000"){
+      if(!process.env.ROSS_USER||!process.env.ROSS_PASSWORD||!process.env.ROSS_STRUCTURE_CODE) throw new Error("ROSS 1000 non configurato: servono ROSS_USER, ROSS_PASSWORD e ROSS_STRUCTURE_CODE.");
+      const result=await rossSend(stay);
+      db.prepare("INSERT INTO submissions(stay_id,service,status,detail,created_at) VALUES(?,?,?,?,?)").run(row.id,service,result.status,JSON.stringify(result),new Date().toISOString());
+      return res.json(result);
+    }
+    res.status(400).json({error:"SERVIZIO_NON_SUPPORTATO"});
+  }catch(e){
+    const detail=String(e.message||e);
+    db.prepare("INSERT INTO submissions(stay_id,service,status,detail,created_at) VALUES(?,?,?,?,?)").run(row.id,service,"error",detail,new Date().toISOString());
+    res.status(502).json({ok:false,status:"error",error:detail});
   }
-  if(service==="ross1000"){
-    const detail="Endpoint ROSS 1000 configurato; il tracciato XML definitivo deve essere validato sulla versione WS della Regione Lazio prima dell'invio reale.";
-    db.prepare("INSERT INTO submissions(stay_id,service,status,detail,created_at) VALUES(?,?,?,?,?)")
-      .run(stay.id,service,"blocked",detail,new Date().toISOString());
-    return res.json({ok:false,status:"blocked",detail});
-  }
-  res.status(400).json({error:"SERVIZIO_NON_SUPPORTATO"});
 });
 
-app.get("/api/submissions",(req,res)=>{
-  res.json(db.prepare("SELECT * FROM submissions ORDER BY id DESC LIMIT 200").all());
-});
+function rossXmlEscape(s=""){return xmlEscape(s);}
+async function rossSend(stay){
+  const endpoint=process.env.ROSS_ENDPOINT||"https://lazioturismo.ross1000.it/ws/checkinV2";
+  const product=process.env.ROSS_PRODUCT||"CheckIn Lazio";
+  const tourism=process.env.ROSS_TOURISM_DEFAULT||"Non Specificato";
+  const transport=process.env.ROSS_TRANSPORT_DEFAULT||"Non specificato";
+  const channel=process.env.ROSS_CHANNEL_DEFAULT||"Non specificato";
+  const roomsAvailable=Number(process.env.ROSS_ROOMS_AVAILABLE||1);
+  const bedsAvailable=Number(process.env.ROSS_BEDS_AVAILABLE||stay.guests.length);
+  const roomOccupied=1;
+  const arrivi=stay.guests.map((g,i)=>`<arrivo><idswh>${rossXmlEscape(`${stay.id}-${i+1}`)}</idswh><tipoalloggiato>16</tipoalloggiato><idcapo></idcapo><cognome>${rossXmlEscape(g.cognome)}</cognome><nome>${rossXmlEscape(g.nome)}</nome><sesso>${g.sesso||""}</sesso><cittadinanza>${rossXmlEscape(g.cittadinanza_code||g.cittadinanza||"")}</cittadinanza><statoresidenza>${rossXmlEscape(g.residenza_stato_code||g.residenza_stato||"")}</statoresidenza><luogoresidenza>${rossXmlEscape(g.residenza_luogo||"")}</luogoresidenza><datanascita>${yyyymmdd(g.nascita)}</datanascita><statonascita>${rossXmlEscape(g.stato_nascita_code||g.stato_nascita||g.cittadinanza||"")}</statonascita><comunenascita>${rossXmlEscape(g.comune_nascita_code||"")}</comunenascita><tipoturismo>${rossXmlEscape(g.tipoturismo||tourism)}</tipoturismo><mezzotrasporto>${rossXmlEscape(g.mezzotrasporto||transport)}</mezzotrasporto><canaleprenotazione>${rossXmlEscape(g.canaleprenotazione||channel)}</canaleprenotazione><titolostudio>${rossXmlEscape(g.titolostudio||"")}</titolostudio><professione>${rossXmlEscape(g.professione||"")}</professione><esenzioneimposta>${rossXmlEscape(g.esenzioneimposta||"")}</esenzioneimposta></arrivo>`).join("");
+  const xml=`<?xml version="1.0" encoding="UTF-8"?><S:Envelope xmlns:S="http://schemas.xmlsoap.org/soap/envelope/"><S:Body><ns2:inviaMovimentazione xmlns:ns2="http://checkin.ws.service.turismo5.gies.it/"><movimentazione><codice>${rossXmlEscape(process.env.ROSS_STRUCTURE_CODE)}</codice><prodotto>${rossXmlEscape(product)}</prodotto><movimento><data>${yyyymmdd(stay.arrival)}</data><struttura><apertura>SI</apertura><camereoccupate>${roomOccupied}</camereoccupate><cameredisponibili>${roomsAvailable}</cameredisponibili><lettidisponibili>${bedsAvailable}</lettidisponibili></struttura><arrivi>${arrivi}</arrivi></movimento></movimentazione></ns2:inviaMovimentazione></S:Body></S:Envelope>`;
+  const auth=Buffer.from(`${process.env.ROSS_USER}:${process.env.ROSS_PASSWORD}`).toString("base64");
+  const r=await fetch(endpoint,{method:"POST",headers:{Accept:"text/xml, multipart/related",Authorization:`Basic ${auth}`,"Content-Type":"text/xml; charset=utf-8",SOAPAction:"","User-Agent":"CheckIn-Lazio/1.0"},body:xml});
+  const text=await r.text();
+  if(!r.ok) throw new Error(`ROSS HTTP ${r.status}: ${text.slice(0,800)}`);
+  const fault=tag(text,"faultstring")||tag(text,"detail");
+  if(fault) return {ok:false,status:"error",error:fault,raw:text.slice(0,5000)};
+  return {ok:true,status:"sent",message:"ROSS 1000 ha accettato la richiesta HTTP SOAP.",raw:text.slice(0,5000)};
+}
 
-app.get(/.*/,(req,res)=>res.sendFile(path.join(__dirname,"public","index.html")));
-
+app.get(/.*/, (req,res)=>res.sendFile(path.join(__dirname,"public","index.html")));
 app.listen(PORT,()=>console.log(`CheckIn Lazio cloud server on :${PORT}`));
