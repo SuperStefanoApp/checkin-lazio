@@ -6,6 +6,7 @@
 <meta name="theme-color" content="#123b5d">
 <link rel="manifest" href="/manifest.json">
 <title>CheckIn Lazio</title>
+<script src="https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js"></script>
 <style>
 :root{font-family:system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;color:#163047;background:#f4f7fa}
 *{box-sizing:border-box}body{margin:0}.top{background:#123b5d;color:#fff;padding:18px 20px;position:sticky;top:0;z-index:5}.top h1{margin:0;font-size:22px}.wrap{max-width:900px;margin:0 auto;padding:18px}.card{background:#fff;border-radius:16px;padding:18px;margin-bottom:16px;box-shadow:0 2px 12px #00000012}.grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px}@media(max-width:650px){.grid{grid-template-columns:1fr}}label{font-weight:600;font-size:13px;display:block;margin-bottom:6px}input,button,select{width:100%;padding:12px;border:1px solid #ccd6df;border-radius:10px;font-size:16px}button{background:#123b5d;color:#fff;border:0;font-weight:700;cursor:pointer}.secondary{background:#e9eef3;color:#123b5d}.danger{background:#a62929}.guest{border:1px solid #dce4eb;border-radius:12px;padding:14px;margin:12px 0}.row{display:flex;gap:10px;align-items:center}.row>*{flex:1}.status{padding:10px;border-radius:10px;background:#eef5fa;margin-top:12px}.small{font-size:12px;color:#617487}.hidden{display:none}.pill{display:inline-block;padding:5px 9px;border-radius:999px;background:#e9eef3;font-size:12px}
@@ -25,19 +26,22 @@
 <h2>Nuovo check-in</h2>
 <div class="grid">
 <div><label>Arrivo</label><input id="arrival" type="date"></div>
-<div><label>Notti</label><input id="nights" type="number" min="1" value="1" onchange="calcDeparture()"></div>
-<div><label>Partenza</label><input id="departure" type="date" readonly></div>
+<div><label>Partenza</label><input id="departure" type="date"></div>
+<div><label>Notti</label><input id="nights" type="number" min="1" value="1"></div>
 <div><label>Numero ospiti</label><input id="party" type="number" min="1" value="1" onchange="syncGuests()"></div>
 </div>
+<div class="small" style="margin-top:8px">Le notti sono calcolate come differenza tra arrivo e partenza: arrivo 12/11 e partenza 14/11 = 2 notti.</div>
 <div id="guests"></div>
 <div class="row" style="margin-top:10px"><button class="secondary" onclick="addManual()">+ Inserisci manualmente</button><button onclick="saveStay()">Salva check-in</button></div>
 <div id="saveMsg" class="status hidden"></div>
 </div>
 
 <div class="card">
-<h2>Documento</h2>
-<p class="small">Sul telefono puoi usare la fotocamera. L'immagine viene elaborata nel browser per leggere MRZ/OCR e poi i dati restano modificabili prima del salvataggio.</p>
-<input id="doc" type="file" accept="image/*" capture="environment" onchange="scanDoc()">
+<h2>Scansione documento</h2>
+<p class="small">Fotografa la carta d'identità elettronica o il passaporto. L'app esegue OCR e, quando presente, legge la MRZ. I dati trovati vengono riportati nella scheda dell'ospite e restano sempre modificabili.</p>
+<div class="row"><button type="button" onclick="document.getElementById('doc').click()">📷 Scansiona documento</button><button type="button" class="secondary" onclick="clearScan()">Cancella</button></div>
+<input id="doc" type="file" accept="image/*" capture="environment" onchange="scanDoc()" style="display:none">
+<img id="docPreview" class="hidden" style="width:100%;max-height:320px;object-fit:contain;margin-top:12px;border-radius:12px" alt="Anteprima documento">
 <div id="ocrMsg" class="status hidden"></div>
 </div>
 
@@ -57,17 +61,86 @@
 let token=localStorage.getItem("checkin_token")||"";
 function api(path,opt={}){opt.headers={...(opt.headers||{}),Authorization:"Bearer "+token,"Content-Type":"application/json"};return fetch(path,opt)}
 function show(id,msg){const e=document.getElementById(id);e.textContent=msg;e.classList.remove("hidden")}
-async function login(){const r=await fetch("/api/login",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({username:user.value,password:pass.value})});const j=await r.json();if(j.ok){token=j.token;localStorage.setItem("checkin_token",token);document.getElementById("login").classList.add("hidden");document.getElementById("app").classList.remove("hidden");syncGuests();calcDeparture()}else show("loginMsg",j.error||"Accesso negato")}
-function calcDeparture(){if(!arrival.value)return;const d=new Date(arrival.value+"T00:00:00");d.setDate(d.getDate()+Number(nights.value||1));departure.value=d.toISOString().slice(0,10)}
+async function login(){const r=await fetch("/api/login",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({username:user.value,password:pass.value})});const j=await r.json();if(j.ok){token=j.token;localStorage.setItem("checkin_token",token);document.getElementById("login").classList.add("hidden");document.getElementById("app").classList.remove("hidden");syncGuests();setDepartureFromNights()}else show("loginMsg",j.error||"Accesso negato")}
+function dateDiff(a,b){if(!a||!b)return null;const A=new Date(a+"T00:00:00"),B=new Date(b+"T00:00:00");return Math.round((B-A)/86400000)}
+function setDepartureFromNights(){if(!arrival.value)return;const n=Number(nights.value||0);if(n<1)return;const d=new Date(arrival.value+"T00:00:00");d.setDate(d.getDate()+n);departure.value=d.toISOString().slice(0,10)}
+function setNightsFromDates(){const n=dateDiff(arrival.value,departure.value);if(n!==null&&n>=1)nights.value=n}
 function guestHtml(i){return `<div class="guest"><div class="pill">Ospite ${i}</div><div class="grid" style="margin-top:10px"><div><label>Nome</label><input data-f="nome"></div><div><label>Cognome</label><input data-f="cognome"></div><div><label>Data di nascita</label><input data-f="nascita" type="date"></div><div><label>Luogo di nascita</label><input data-f="luogo_nascita"></div><div><label>Sesso</label><select data-f="sesso"><option value="">Seleziona</option><option>M</option><option>F</option></select></div><div><label>Cittadinanza</label><input data-f="cittadinanza"></div><div><label>Tipo documento</label><input data-f="tipo_documento" placeholder="Carta identità / Passaporto"></div><div><label>Numero documento</label><input data-f="numero_documento"></div><div><label>Stato rilascio</label><input data-f="stato_documento"></div><div><label>Data arrivo</label><input data-f="arrivo" type="date"></div></div></div>`}
 function syncGuests(){let n=Math.max(1,Number(party.value||1));guests.innerHTML=Array.from({length:n},(_,i)=>guestHtml(i+1)).join("")}
 function addManual(){party.value=Number(party.value||0)+1;syncGuests();guests.lastElementChild?.scrollIntoView({behavior:"smooth"})}
 function collectGuests(){return [...document.querySelectorAll(".guest")].map(g=>Object.fromEntries([...g.querySelectorAll("[data-f]")].map(x=>[x.dataset.f,x.value])))}
-async function saveStay(){calcDeparture();const gs=collectGuests();const r=await api("/api/stays",{method:"POST",body:JSON.stringify({arrival:arrival.value,nights:Number(nights.value),departure:departure.value,guests:gs})});const j=await r.json();show("saveMsg",j.ok?`Check-in salvato. ID ${j.id}`:(j.error||"Errore"))}
+async function saveStay(){setNightsFromDates();if(!arrival.value||!departure.value||Number(nights.value)<1){show("saveMsg","Controlla arrivo e partenza: la partenza deve essere successiva all'arrivo.");return}const gs=collectGuests();const r=await api("/api/stays",{method:"POST",body:JSON.stringify({arrival:arrival.value,nights:Number(nights.value),departure:departure.value,guests:gs})});const j=await r.json();show("saveMsg",j.ok?`Check-in salvato. ID ${j.id}`:(j.error||"Errore"))}
 async function testService(s){const r=await api("/api/test/"+s,{method:"POST"});const j=await r.json();show("serviceMsg",j.ok?j.message:(j.error||"Test non riuscito"))}
-async function scanDoc(){show("ocrMsg","Elaborazione documento…");try{const f=doc.files[0];if(!f) return;show("ocrMsg","Documento acquisito. OCR/MRZ pronto per l'integrazione del motore di riconoscimento.");}catch(e){show("ocrMsg","Errore lettura documento")}}
+function mrzDate(v){if(!/^[0-9]{6}$/.test(v))return "";const yy=Number(v.slice(0,2)),mm=v.slice(2,4),dd=v.slice(4,6);const year=yy>=50?1900+yy:2000+yy;return `${year}-${mm}-${dd}`}
+function cleanMrzLine(s){return s.toUpperCase().replace(/[^A-Z0-9<]/g,"")}
+function parseMrz(text){
+ const lines=text.toUpperCase().split(/\r?\n/).map(cleanMrzLine).filter(x=>x.length>=20);
+ const candidates=[];
+ for(let i=0;i<lines.length;i++){
+   if(lines[i].startsWith("P<")&&lines[i].length>=40&&lines[i+1]) candidates.push([lines[i],lines[i+1]]);
+   if(lines[i].length>=28&&lines[i+1]&&lines[i+1].length>=28&&!lines[i].startsWith("P<")) candidates.push([lines[i],lines[i+1],lines[i+2]||""]);
+ }
+ for(const c of candidates){
+   if(c.length===2){
+     const l1=c[0].padEnd(44,"<"),l2=c[1].padEnd(44,"<");
+     const doc=l2.slice(0,9).replace(/</g,"");
+     const nat=l2.slice(10,13).replace(/</g,"");
+     const dob=l2.slice(13,19);
+     const sex=l2.slice(20,21);
+     const exp=l2.slice(21,27);
+     const names=l1.slice(5).split("<<");
+     const surname=(names[0]||"").replace(/</g," ").trim();
+     const given=(names[1]||"").replace(/</g," ").trim();
+     return {tipo_documento:"Passaporto",numero_documento:doc,cittadinanza:nat,nascita:mrzDate(dob),sesso:sex==="M"||sex==="F"?sex:"",scadenza:mrzDate(exp),cognome:surname,nome:given};
+   }
+   if(c.length===3){
+     const l1=c[0].padEnd(30,"<"),l2=c[1].padEnd(30,"<"),l3=c[2].padEnd(30,"<");
+     const doc=l1.slice(5,14).replace(/</g,"");
+     const birth=l2.slice(0,6),sex=l2.slice(7,8),exp=l2.slice(8,14),nat=l2.slice(15,18).replace(/</g,"");
+     const names=l3.split("<<");
+     const surname=(names[0]||"").replace(/</g," ").trim();
+     const given=(names[1]||"").replace(/</g," ").trim();
+     return {tipo_documento:"Carta d'identità",numero_documento:doc,nascita:mrzDate(birth),sesso:sex==="M"||sex==="F"?sex:"",scadenza:mrzDate(exp),cittadinanza:nat,cognome:surname,nome:given};
+   }
+ }
+ return null;
+}
+function cropMrzImage(file){return new Promise((resolve,reject)=>{const img=new Image();img.onload=()=>{const canvas=document.createElement("canvas");canvas.width=img.naturalWidth;canvas.height=Math.floor(img.naturalHeight*0.48);const ctx=canvas.getContext("2d");ctx.drawImage(img,0,img.naturalHeight-canvas.height,img.naturalWidth,canvas.height,0,0,canvas.width,canvas.height);resolve(canvas)};img.onerror=reject;img.src=URL.createObjectURL(file)})}
+
+function applyDocData(data){const g=document.querySelector(".guest");if(!g)return;for(const [k,v] of Object.entries(data||{})){const el=g.querySelector(`[data-f="${k}"]`);if(el&&v)el.value=v}}
+async function scanDoc(){
+ const f=doc.files[0];
+ if(!f)return;
+ const preview=document.getElementById("docPreview");
+ preview.src=URL.createObjectURL(f);
+ preview.classList.remove("hidden");
+ show("ocrMsg","Analisi documento in corso…");
+ try{
+   const full=await Tesseract.recognize(f,"ita+eng",{logger:m=>{if(m.status&&m.progress)show("ocrMsg",`OCR: ${m.status} ${Math.round(m.progress*100)}%`)}});
+   let text=full.data.text||"";
+   let data=parseMrz(text);
+   if(!data){
+     show("ocrMsg","Ricerca MRZ nella parte bassa del documento…");
+     const crop=await cropMrzImage(f);
+     const mrz=await Tesseract.recognize(crop,"eng",{config:{tessedit_char_whitelist:"ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789<",tessedit_pageseg_mode:"6"}});
+     text += "\n" + (mrz.data.text||"");
+     data=parseMrz(text);
+   }
+   if(data){
+     applyDocData(data);
+     show("ocrMsg","✓ MRZ riconosciuta. I dati sono stati compilati automaticamente. Controllali e modificali prima di salvare.");
+   }else{
+     show("ocrMsg","OCR completato, ma la MRZ non è stata riconosciuta con sufficiente affidabilità. I dati non vengono inventati: controllali e compilali/modificali manualmente.");
+   }
+ }catch(e){
+   show("ocrMsg","OCR non disponibile o documento illeggibile. Puoi compilare i dati manualmente.");
+ }
+}
+function clearScan(){doc.value="";document.getElementById("docPreview").classList.add("hidden");document.getElementById("docPreview").removeAttribute("src");document.getElementById("ocrMsg").classList.add("hidden")}
 function showHistory(){api("/api/stays").then(r=>r.json()).then(rows=>show("serviceMsg",`Storico: ${rows.length} soggiorni presenti.`))}
-document.getElementById("arrival").addEventListener("change",calcDeparture);
-if(token){document.getElementById("login").classList.add("hidden");document.getElementById("app").classList.remove("hidden");syncGuests();calcDeparture()}
+document.getElementById("arrival").addEventListener("change",()=>{if(departure.value)setNightsFromDates();else setDepartureFromNights()});
+document.getElementById("departure").addEventListener("change",setNightsFromDates);
+document.getElementById("nights").addEventListener("change",setDepartureFromNights);
+if(token){document.getElementById("login").classList.add("hidden");document.getElementById("app").classList.remove("hidden");syncGuests();setDepartureFromNights()}
 </script>
 </body></html>
