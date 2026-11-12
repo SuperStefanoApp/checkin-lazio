@@ -32,7 +32,10 @@ app.use(express.json({limit:"10mb"}));
 app.use(express.static(path.join(__dirname,"public")));
 
 function auth(req,res,next){
-  if(req.path === "/api/health" || req.path === "/api/login") return next();
+  // When mounted with app.use("/api", auth), Express exposes req.path without
+  // the mount prefix. Use originalUrl so the public routes are unambiguous.
+  const publicUrl = req.originalUrl.split("?")[0];
+  if(publicUrl === "/api/health" || publicUrl === "/api/login") return next();
   const h = req.headers.authorization || "";
   if(!h.startsWith("Bearer ")) return res.status(401).json({error:"AUTH_REQUIRED"});
   const token = h.slice(7);
@@ -133,6 +136,6 @@ app.get("/api/submissions",(req,res)=>{
   res.json(db.prepare("SELECT * FROM submissions ORDER BY id DESC LIMIT 200").all());
 });
 
-app.get("/{*splat}",(req,res)=>res.sendFile(path.join(__dirname,"public","index.html")));
+app.get(/.*/,(req,res)=>res.sendFile(path.join(__dirname,"public","index.html")));
 
 app.listen(PORT,()=>console.log(`CheckIn Lazio cloud server on :${PORT}`));
