@@ -181,7 +181,7 @@ app.post("/api/test/ross1000",async(req,res)=>{
   try{
     if(!process.env.ROSS_USER||!process.env.ROSS_PASSWORD||!process.env.ROSS_STRUCTURE_CODE)
       throw new Error("ROSS 1000 non configurato: servono ROSS_USER, ROSS_PASSWORD e ROSS_STRUCTURE_CODE.");
-    const endpoint=(process.env.ROSS_ENDPOINT||"https://lazioturismo.ross1000.it/ws/checkinV2").replace(/\\/$/,"");
+    const endpoint=(process.env.ROSS_ENDPOINT||"https://lazioturismo.ross1000.it/ws/checkinV2").replace(/\/$/,"");
     const wsdl=endpoint+"?wsdl";
     const auth=Buffer.from(`${process.env.ROSS_USER}:${process.env.ROSS_PASSWORD}`).toString("base64");
     const r=await fetch(wsdl,{method:"GET",headers:{

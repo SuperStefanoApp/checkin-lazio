@@ -21,3 +21,7 @@ V9
 - Corretto il test ROSS 1000: la V8 faceva una GET diretta su /ws/checkinV2, che può restituire HTTP 500 perché il servizio è SOAP e richiede POST.
 - Il test V9 interroga il WSDL /ws/checkinV2?wsdl con Basic Authentication.
 - Il test non invia alcun movimento turistico.
+
+V10
+- Corretto un errore di sintassi JavaScript introdotto nel test ROSS 1000 della V9.
+- Il test ROSS ora può essere avviato senza l'errore "Invalid regular expression flags".
