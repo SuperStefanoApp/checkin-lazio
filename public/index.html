@@ -39,10 +39,9 @@
 <div class="card">
 <h2>Lettura documento</h2>
 <p class="small"><strong>Questa versione non usa più l'OCR generico della fotografia.</strong> Utilizza una lettura MRZ dedicata ai documenti ICAO (passaporti e carte d'identità con zona a lettura ottica). La lettura avviene direttamente sul dispositivo. Il sistema controlla anche i caratteri di verifica della MRZ prima di compilare i dati.</p>
-<button type="button" onclick="startMrzScanner()">📷 Leggi MRZ con fotocamera</button>
 <div id="mrzPanel" class="hidden">
   <div id="mrz-reader"></div>
-  <div class="scan-note">Posiziona <strong>la parte inferiore del documento</strong>, dove sono presenti le 2 o 3 righe composte da lettere, numeri e simboli &lt;, dentro l'area di scansione. Non fotografare semplicemente il documento intero.</div>
+  <div class="scan-note">Posiziona <strong>la parte inferiore del documento dell'ospite selezionato</strong>, dove sono presenti le 2 o 3 righe composte da lettere, numeri e simboli &lt;, dentro l'area di scansione. Non fotografare semplicemente il documento intero.</div>
   <div class="scan-actions"><button type="button" class="secondary" onclick="captureMrz()" id="mrzCapture">Leggi documento</button><button type="button" class="secondary" onclick="stopMrzScanner()">Chiudi</button></div>
   <div id="mrzMsg" class="status hidden"></div>
 </div>
@@ -65,6 +64,8 @@
 <script>
 let token=localStorage.getItem("checkin_token")||"";
 let mrzReader=null;
+const COUNTRY_NAMES = {"ABW": "Aruba", "AFG": "Afghanistan", "AGO": "Angola", "AIA": "Anguilla", "ALA": "Isole Åland", "ALB": "Albania", "AND": "Andorra", "ARE": "Emirati Arabi Uniti", "ARG": "Argentina", "ARM": "Armenia", "ASM": "Samoa Americane", "ATA": "Antartide", "ATF": "Terre Australi Francesi", "ATG": "Antigua e Barbuda", "AUS": "Australia", "AUT": "Austria", "AZE": "Azerbaigian", "BDI": "Burundi", "BEL": "Belgio", "BEN": "Benin", "BES": "Caraibi Olandesi", "BFA": "Burkina Faso", "BGD": "Bangladesh", "BGR": "Bulgaria", "BHR": "Bahrein", "BHS": "Bahamas", "BIH": "Bosnia ed Erzegovina", "BLM": "Saint-Barthélemy", "BLR": "Bielorussia", "BLZ": "Belize", "BMU": "Bermuda", "BOL": "Bolivia", "BRA": "Brasile", "BRB": "Barbados", "BRN": "Brunei", "BTN": "Bhutan", "BVT": "Isola Bouvet", "BWA": "Botswana", "CAF": "Repubblica Centrafricana", "CAN": "Canada", "CCK": "Isole Cocos (Keeling)", "CHE": "Svizzera", "CHL": "Cile", "CHN": "Cina", "CIV": "Costa d’Avorio", "CMR": "Camerun", "COD": "Congo - Kinshasa", "COG": "Congo-Brazzaville", "COK": "Isole Cook", "COL": "Colombia", "COM": "Comore", "CPV": "Capo Verde", "CRI": "Costa Rica", "CUB": "Cuba", "CUW": "Curaçao", "CXR": "Isola Christmas", "CYM": "Isole Cayman", "CYP": "Cipro", "CZE": "Cechia", "DEU": "Germania", "DJI": "Gibuti", "DMA": "Dominica", "DNK": "Danimarca", "DOM": "Repubblica Dominicana", "DZA": "Algeria", "ECU": "Ecuador", "EGY": "Egitto", "ERI": "Eritrea", "ESH": "Sahara Occidentale", "ESP": "Spagna", "EST": "Estonia", "ETH": "Etiopia", "FIN": "Finlandia", "FJI": "Figi", "FLK": "Isole Falkland", "FRA": "Francia", "FRO": "Isole Fær Øer", "FSM": "Micronesia", "GAB": "Gabon", "GBR": "Regno Unito", "GEO": "Georgia", "GGY": "Guernsey", "GHA": "Ghana", "GIB": "Gibilterra", "GIN": "Guinea", "GLP": "Guadalupa", "GMB": "Gambia", "GNB": "Guinea-Bissau", "GNQ": "Guinea Equatoriale", "GRC": "Grecia", "GRD": "Grenada", "GRL": "Groenlandia", "GTM": "Guatemala", "GUF": "Guyana Francese", "GUM": "Guam", "GUY": "Guyana", "HKG": "RAS di Hong Kong", "HMD": "Isole Heard e McDonald", "HND": "Honduras", "HRV": "Croazia", "HTI": "Haiti", "HUN": "Ungheria", "IDN": "Indonesia", "IMN": "Isola di Man", "IND": "India", "IOT": "Territorio Britannico dell’Oceano Indiano", "IRL": "Irlanda", "IRN": "Iran", "IRQ": "Iraq", "ISL": "Islanda", "ISR": "Israele", "ITA": "Italia", "JAM": "Giamaica", "JEY": "Jersey", "JOR": "Giordania", "JPN": "Giappone", "KAZ": "Kazakistan", "KEN": "Kenya", "KGZ": "Kirghizistan", "KHM": "Cambogia", "KIR": "Kiribati", "KNA": "Saint Kitts e Nevis", "KOR": "Corea del Sud", "KWT": "Kuwait", "LAO": "Laos", "LBN": "Libano", "LBR": "Liberia", "LBY": "Libia", "LCA": "Saint Lucia", "LIE": "Liechtenstein", "LKA": "Sri Lanka", "LSO": "Lesotho", "LTU": "Lituania", "LUX": "Lussemburgo", "LVA": "Lettonia", "MAC": "RAS di Macao", "MAF": "Saint Martin", "MAR": "Marocco", "MCO": "Monaco", "MDA": "Moldavia", "MDG": "Madagascar", "MDV": "Maldive", "MEX": "Messico", "MHL": "Isole Marshall", "MKD": "Macedonia del Nord", "MLI": "Mali", "MLT": "Malta", "MMR": "Myanmar (Birmania)", "MNE": "Montenegro", "MNG": "Mongolia", "MNP": "Isole Marianne Settentrionali", "MOZ": "Mozambico", "MRT": "Mauritania", "MSR": "Montserrat", "MTQ": "Martinica", "MUS": "Mauritius", "MWI": "Malawi", "MYS": "Malaysia", "MYT": "Mayotte", "NAM": "Namibia", "NCL": "Nuova Caledonia", "NER": "Niger", "NFK": "Isola Norfolk", "NGA": "Nigeria", "NIC": "Nicaragua", "NIU": "Niue", "NLD": "Paesi Bassi", "NOR": "Norvegia", "NPL": "Nepal", "NRU": "Nauru", "NZL": "Nuova Zelanda", "OMN": "Oman", "PAK": "Pakistan", "PAN": "Panama", "PCN": "Isole Pitcairn", "PER": "Perù", "PHL": "Filippine", "PLW": "Palau", "PNG": "Papua Nuova Guinea", "POL": "Polonia", "PRI": "Portorico", "PRK": "Corea del Nord", "PRT": "Portogallo", "PRY": "Paraguay", "PSE": "Territori Palestinesi", "PYF": "Polinesia Francese", "QAT": "Qatar", "REU": "Riunione", "ROU": "Romania", "RUS": "Russia", "RWA": "Ruanda", "SAU": "Arabia Saudita", "SDN": "Sudan", "SEN": "Senegal", "SGP": "Singapore", "SGS": "Georgia del Sud e Sandwich Australi", "SHN": "Sant’Elena", "SJM": "Svalbard e Jan Mayen", "SLB": "Isole Salomone", "SLE": "Sierra Leone", "SLV": "El Salvador", "SMR": "San Marino", "SOM": "Somalia", "SPM": "Saint-Pierre e Miquelon", "SRB": "Serbia", "SSD": "Sud Sudan", "STP": "São Tomé e Príncipe", "SUR": "Suriname", "SVK": "Slovacchia", "SVN": "Slovenia", "SWE": "Svezia", "SWZ": "Eswatini", "SXM": "Sint Maarten", "SYC": "Seychelles", "SYR": "Siria", "TCA": "Isole Turks e Caicos", "TCD": "Ciad", "TGO": "Togo", "THA": "Thailandia", "TJK": "Tagikistan", "TKL": "Tokelau", "TKM": "Turkmenistan", "TLS": "Timor Est", "TON": "Tonga", "TTO": "Trinidad e Tobago", "TUN": "Tunisia", "TUR": "Turchia", "TUV": "Tuvalu", "TWN": "Taiwan", "TZA": "Tanzania", "UGA": "Uganda", "UKR": "Ucraina", "UMI": "Isole Minori Esterne degli Stati Uniti", "URY": "Uruguay", "USA": "Stati Uniti", "UZB": "Uzbekistan", "VAT": "Città del Vaticano", "VCT": "Saint Vincent e Grenadine", "VEN": "Venezuela", "VGB": "Isole Vergini Britanniche", "VIR": "Isole Vergini Americane", "VNM": "Vietnam", "VUT": "Vanuatu", "WLF": "Wallis e Futuna", "WSM": "Samoa", "XKX": "Kosovo", "YEM": "Yemen", "ZAF": "Sudafrica", "ZMB": "Zambia", "ZWE": "Zimbabwe"};
+function countryName(code){const c=String(code||"").trim().toUpperCase(); return COUNTRY_NAMES[c]||c;}
 
 function api(path,opt={}){opt.headers={...(opt.headers||{}),Authorization:"Bearer "+token,"Content-Type":"application/json"};return fetch(path,opt)}
 function show(id,msg){const e=document.getElementById(id);e.textContent=msg;e.classList.remove("hidden")}
@@ -89,7 +90,7 @@ function addDays(dateStr,n){
 function setDepartureFromNights(){if(!arrival.value)return;const n=Number(nights.value||0);if(n<1)return;departure.value=addDays(arrival.value,n)}
 function setNightsFromDates(){const n=dateDiff(arrival.value,departure.value);if(n!==null&&n>=1)nights.value=n}
 
-function guestHtml(i){return `<div class="guest"><div class="pill">Ospite ${i}</div><div class="grid" style="margin-top:10px"><div><label>Nome</label><input data-f="nome"></div><div><label>Cognome</label><input data-f="cognome"></div><div><label>Data di nascita</label><input data-f="nascita" type="date"></div><div><label>Luogo di nascita</label><input data-f="luogo_nascita"></div><div><label>Sesso</label><select data-f="sesso"><option value="">Seleziona</option><option value="M">M</option><option value="F">F</option></select></div><div><label>Cittadinanza</label><input data-f="cittadinanza"></div><div><label>Tipo documento</label><input data-f="tipo_documento" placeholder="Carta identità / Passaporto"></div><div><label>Numero documento</label><input data-f="numero_documento"></div><div><label>Stato rilascio</label><input data-f="stato_documento"></div><div><label>Data arrivo</label><input data-f="arrivo" type="date"></div></div></div>`}
+function guestHtml(i){return `<div class="guest" data-guest-index="${i-1}"><div class="pill">Ospite ${i}</div><div class="grid" style="margin-top:10px"><div><label>Nome</label><input data-f="nome"></div><div><label>Cognome</label><input data-f="cognome"></div><div><label>Data di nascita</label><input data-f="nascita" type="date"></div><div><label>Luogo di nascita</label><input data-f="luogo_nascita"></div><div><label>Sesso</label><select data-f="sesso"><option value="">Seleziona</option><option value="M">M</option><option value="F">F</option></select></div><div><label>Cittadinanza</label><input data-f="cittadinanza"></div><div><label>Tipo documento</label><input data-f="tipo_documento" placeholder="Carta identità / Passaporto"></div><div><label>Numero documento</label><input data-f="numero_documento"></div><div><label>Stato rilascio</label><input data-f="stato_documento"></div></div><button type="button" class="secondary" style="margin-top:12px" onclick="scanGuestMrz(${i-1})">📷 Leggi documento di Ospite ${i}</button><div class="small" style="margin-top:6px">La lettura MRZ verrà inserita esclusivamente in questo ospite.</div></div>`}
 function syncGuests(){let n=Math.max(1,Number(party.value||1));guests.innerHTML=Array.from({length:n},(_,i)=>guestHtml(i+1)).join("")}
 function addManual(){party.value=Number(party.value||0)+1;syncGuests();guests.lastElementChild?.scrollIntoView({behavior:"smooth"})}
 function collectGuests(){return [...document.querySelectorAll(".guest")].map(g=>Object.fromEntries([...g.querySelectorAll("[data-f]")].map(x=>[x.dataset.f,x.value])))}
@@ -98,21 +99,28 @@ async function testService(s){const r=await api("/api/test/"+s,{method:"POST"});
 
 function mrzDate(v){if(!/^[0-9]{6}$/.test(v))return "";const yy=Number(v.slice(0,2)),mm=v.slice(2,4),dd=v.slice(4,6);const year=yy>=50?1900+yy:2000+yy;return `${year}-${mm}-${dd}`}
 
+let activeGuestIndex=0;
+
+function getGuest(index){return document.querySelector(`.guest[data-guest-index="${index}"]`)}
+function scanGuestMrz(index){activeGuestIndex=index;startMrzScanner()}
+
 function applyMrzResult(result){
  const p=result?.parsed;
  if(!p || typeof p!=="object") return false;
- const g=document.querySelector(".guest"); if(!g) return false;
+ const g=getGuest(activeGuestIndex); if(!g) return false;
  const get=(...keys)=>{for(const k of keys){if(p[k]!=null&&String(p[k]).trim()!=="")return String(p[k]).trim()}return ""};
  const sex=get("Gender");
+ const nationality=countryName(get("Nationality"));
+ const issuing=countryName(get("Issuing Country"));
  const data={
    nome:get("Given Names"),
    cognome:get("Surname"),
    nascita:mrzDate(get("Date of Birth")),
    sesso:sex==="Male"?"M":sex==="Female"?"F":"",
-   cittadinanza:get("Nationality"),
+   cittadinanza:nationality,
    tipo_documento:p["Passport Number"]?"Passaporto":"Carta d'identità",
    numero_documento:get("Passport Number","Document Number"),
-   stato_documento:get("Issuing Country")
+   stato_documento:issuing
  };
  for(const [k,v] of Object.entries(data)){const el=g.querySelector(`[data-f="${k}"]`);if(el&&v)el.value=v}
  const validation=p.Validation;
@@ -122,7 +130,6 @@ function applyMrzResult(result){
 async function loadMrzLibrary(){
  if(window.__mrzModule)return window.__mrzModule;
  show("mrzMsg","Caricamento del lettore MRZ…");
- // Dedicated MRZ reader: custom MRZ-trained model + TD1/TD2/TD3 parsing.
  const mod=await import("https://esm.sh/web-mrz-reader@2.0.3");
  window.__mrzModule=mod;
  return mod;
@@ -143,9 +150,9 @@ async function startMrzScanner(){
      onResult:(result)=>{
        const valid=applyMrzResult(result);
        if(valid){
-         show("mrzMsg","✓ MRZ letta e verificata. I dati sono stati inseriti nell'ospite. Controllali prima di salvare.");
+         show("mrzMsg",`✓ Documento di Ospite ${activeGuestIndex+1} letto e verificato. I dati sono stati inseriti in questo ospite.`);
          document.getElementById("docResult").className="result-box";
-         document.getElementById("docResult").textContent="Documento riconosciuto con controlli MRZ superati.";
+         document.getElementById("docResult").textContent=`Documento riconosciuto e assegnato a Ospite ${activeGuestIndex+1}. Controlla i dati prima di salvare.`;
          setTimeout(()=>stopMrzScanner(),800);
        }else{
          show("mrzMsg","Documento letto, ma i controlli MRZ non sono tutti validi. Riprova mantenendo nitide e complete le righe MRZ.");
