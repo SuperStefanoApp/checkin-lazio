@@ -104,14 +104,14 @@ function guestHtml(i){
 ${first
  ? `<div><label>Tipologia Alloggiato</label><select data-f="tipologia" onchange="updateGuestType(0)"><option value="ospite_singolo">Ospite singolo</option><option value="capo_famiglia">Capo famiglia</option><option value="capo_gruppo">Capo gruppo</option><option value="familiare">Familiare</option><option value="membro_gruppo">Membro gruppo</option></select></div>`
  : `<div><label>Tipologia Alloggiato</label><input data-f="tipologia" readonly value="ospite_singolo"></div>`}
-<div><label>Cittadinanza</label><input data-f="cittadinanza" oninput="syncBirthplaceFromNationality(${i-1})"></div>
+<div><label>Cittadinanza</label><input data-f="cittadinanza" oninput="syncPlacesFromNationality(${i-1})"></div>
 <div><label>Luogo di nascita</label><input data-f="luogo_nascita" oninput="markBirthplaceManual(${i-1})"></div>
 <div><label>Cognome</label><input data-f="cognome"></div>
 <div><label>Nome</label><input data-f="nome"></div>
 <div><label>Data di nascita</label><input data-f="nascita" type="date"></div>
 <div><label>Sesso</label><select data-f="sesso"><option value="">Seleziona</option><option value="M">M</option><option value="F">F</option></select></div>
 ${first?`<div class="doc-field"><label>Tipologia documento</label><select data-f="tipo_documento"><option value="">Seleziona</option><option value="Carta d'identità">Carta d'identità</option><option value="Passaporto">Passaporto</option><option value="Patente">Patente</option><option value="Altro">Altro</option></select></div>
-<div class="doc-field"><label>Luogo di rilascio del documento</label><input data-f="luogo_rilascio_documento"></div>
+<div class="doc-field"><label>Luogo di rilascio del documento</label><input data-f="luogo_rilascio_documento" oninput="markIssuingPlaceManual(0)"></div>
 <div class="doc-field"><label>Numero documento</label><input data-f="numero_documento"></div>`:''}
 </div>
 <button type="button" class="secondary" style="margin-top:12px" onclick="scanGuestMrz(${i-1})">📷 Leggi documento di Ospite ${i}</button>
@@ -138,12 +138,19 @@ function markBirthplaceManual(index){
  const b=g.querySelector('[data-f="luogo_nascita"]');
  if(b && b.value.trim()!==String(g.dataset.birthplaceAutoValue||"").trim()) g.dataset.birthplaceManual="1";
 }
-function syncBirthplaceFromNationality(index){
+function syncPlacesFromNationality(index){
  const g=getGuest(index);if(!g)return;
  const c=g.querySelector('[data-f="cittadinanza"]')?.value?.trim();
+ if(!c)return;
  const b=g.querySelector('[data-f="luogo_nascita"]');
- if(!b||g.dataset.birthplaceManual==="1")return;
- if(c){b.value=c;g.dataset.birthplaceAutoValue=c;}
+ const i=g.querySelector('[data-f="luogo_rilascio_documento"]');
+ if(b&&g.dataset.birthplaceManual!=="1"){b.value=c;g.dataset.birthplaceAutoValue=c;}
+ if(i&&g.dataset.issuingPlaceManual!=="1"){i.value=c;g.dataset.issuingPlaceAutoValue=c;}
+}
+function markIssuingPlaceManual(index){
+ const g=getGuest(index);if(!g)return;
+ const el=g.querySelector('[data-f="luogo_rilascio_documento"]');
+ if(el && el.value.trim()!==String(g.dataset.issuingPlaceAutoValue||"").trim()) g.dataset.issuingPlaceManual="1";
 }
 function collectGuests(){
  return [...document.querySelectorAll(".guest")].map(g=>{
@@ -281,8 +288,8 @@ function parseCieOcr(text){
  const upper=t.toUpperCase();
  const birth=/\b(?:LUOGO|PLACE)\s*(?:DI\s*)?(?:NASCITA|BIRTH)\s*[:\-]?\s*([^\n]+)/i.exec(t);
  const issue=/(?:LUOGO|PLACE)\s*(?:DI\s*)?(?:RILASCIO|EMISSIONE|ISSUE|ISSUED)\s*[:\-]?\s*([^\n]+)/i.exec(t);
- if(birth)set("luogo_nascita",birth[1]);
- if(issue)set("luogo_rilascio_documento",issue[1]);
+ if(birth){set("luogo_nascita",birth[1]);g.dataset.birthplaceManual="1";}
+ if(issue){set("luogo_rilascio_documento",issue[1]);g.dataset.issuingPlaceManual="1";}
  const num=/(?:N\.?|NUMERO|DOCUMENT(?:O| NO\.?)?)\s*[:\-]?\s*([A-Z0-9]{5,})/i.exec(upper);
  if(num)set("numero_documento",num[1]);
  const name=/(?:COGNOME|SURNAME)\s*[:\-]?\s*([^\n]+)/i.exec(t); if(name)set("cognome",name[1]);
@@ -291,7 +298,6 @@ function parseCieOcr(text){
  if(dob){const m=dob[1].match(/(\d{1,2})[\/\.-](\d{1,2})[\/\.-](\d{4})/);if(m)set("nascita",`${m[3]}-${String(m[2]).padStart(2,"0")}-${String(m[1]).padStart(2,"0")}`)}
  const cit=/CITTADINANZA\s*[:\-]?\s*([^\n]+)/i.exec(t);if(cit)set("cittadinanza",cit[1]);
  const gend=/(?:SESSO|SEX)\s*[:\-]?\s*([MF])/i.exec(upper);if(gend)set("sesso",gend[1]);
- g.dataset.birthplaceManual="1";
  show("cieOcrMsg","✓ Analisi completata. Controlla i campi compilati automaticamente: l'OCR può richiedere una correzione manuale.");
  if(cieStream){cieStream.getTracks().forEach(t=>t.stop());cieStream=null}
 }
