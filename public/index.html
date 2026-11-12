@@ -96,44 +96,55 @@ function addDays(dateStr,n){
 function setDepartureFromNights(){if(!arrival.value)return;const n=Number(nights.value||0);if(n<1)return;departure.value=addDays(arrival.value,n)}
 function setNightsFromDates(){const n=dateDiff(arrival.value,departure.value);if(n!==null&&n>=1)nights.value=n}
 
-function guestHtml(i){return `<div class="guest" data-guest-index="${i-1}">
+function guestHtml(i){
+ const first=i===1;
+ return `<div class="guest" data-guest-index="${i-1}">
 <div class="pill">Ospite ${i}</div>
 <div class="grid" style="margin-top:10px">
-<div><label>Tipologia Alloggiato</label><select data-f="tipologia" onchange="updateGuestType(${i-1})"><option value="ospite_singolo">Ospite singolo</option><option value="capo_famiglia">Capo famiglia</option><option value="capo_gruppo">Capo gruppo</option><option value="familiare">Familiare</option><option value="membro_gruppo">Membro gruppo</option></select></div>
-<div><label>Nome</label><input data-f="nome"></div>
-<div><label>Cognome</label><input data-f="cognome"></div>
-<div><label>Data di nascita</label><input data-f="nascita" type="date"></div>
-<div><label>Luogo di nascita</label><input data-f="luogo_nascita" oninput="markBirthplaceManual(${i-1})"></div>
-<div><label>Sesso</label><select data-f="sesso"><option value="">Seleziona</option><option value="M">M</option><option value="F">F</option></select></div>
+${first
+ ? `<div><label>Tipologia Alloggiato</label><select data-f="tipologia" onchange="updateGuestType(0)"><option value="ospite_singolo">Ospite singolo</option><option value="capo_famiglia">Capo famiglia</option><option value="capo_gruppo">Capo gruppo</option><option value="familiare">Familiare</option><option value="membro_gruppo">Membro gruppo</option></select></div>`
+ : `<div><label>Tipologia Alloggiato</label><input data-f="tipologia" readonly value="ospite_singolo"></div>`}
 <div><label>Cittadinanza</label><input data-f="cittadinanza" oninput="syncBirthplaceFromNationality(${i-1})"></div>
-<div class="doc-field"><label>Tipologia documento</label><select data-f="tipo_documento"><option value="">Seleziona</option><option value="Carta d'identità">Carta d'identità</option><option value="Passaporto">Passaporto</option><option value="Patente">Patente</option><option value="Altro">Altro</option></select></div>
+<div><label>Luogo di nascita</label><input data-f="luogo_nascita" oninput="markBirthplaceManual(${i-1})"></div>
+<div><label>Cognome</label><input data-f="cognome"></div>
+<div><label>Nome</label><input data-f="nome"></div>
+<div><label>Data di nascita</label><input data-f="nascita" type="date"></div>
+<div><label>Sesso</label><select data-f="sesso"><option value="">Seleziona</option><option value="M">M</option><option value="F">F</option></select></div>
+${first?`<div class="doc-field"><label>Tipologia documento</label><select data-f="tipo_documento"><option value="">Seleziona</option><option value="Carta d'identità">Carta d'identità</option><option value="Passaporto">Passaporto</option><option value="Patente">Patente</option><option value="Altro">Altro</option></select></div>
 <div class="doc-field"><label>Luogo di rilascio del documento</label><input data-f="luogo_rilascio_documento"></div>
-<div class="doc-field"><label>Numero documento</label><input data-f="numero_documento"></div>
+<div class="doc-field"><label>Numero documento</label><input data-f="numero_documento"></div>`:''}
 </div>
 <button type="button" class="secondary" style="margin-top:12px" onclick="scanGuestMrz(${i-1})">📷 Leggi documento di Ospite ${i}</button>
-<div class="small" style="margin-top:6px">Per i documenti con MRZ viene usata la lettura automatica. Per la CIE italiana puoi anche acquisire il fronte per tentare il riconoscimento OCR di luogo di nascita e luogo di rilascio.</div>
+<div class="small" style="margin-top:6px">Scansione disponibile in modalità <strong>MRZ</strong> oppure <strong>OCR</strong>. La lettura è associata esclusivamente a questo ospite. Per gli ospiti successivi non vengono richiesti i dati del documento.</div>
 </div>`}
-function syncGuests(){let n=Math.max(1,Number(party.value||1));guests.innerHTML=Array.from({length:n},(_,i)=>guestHtml(i+1)).join("");for(let i=0;i<n;i++)updateGuestType(i)}
+function syncGuests(){let n=Math.max(1,Number(party.value||1));guests.innerHTML=Array.from({length:n},(_,i)=>guestHtml(i+1)).join("");applyHeadGuestRule();for(let i=0;i<n;i++)updateGuestType(i)}
 function addManual(){party.value=Number(party.value||0)+1;syncGuests();guests.lastElementChild?.scrollIntoView({behavior:"smooth"})}
 function applyHeadGuestRule(){
  const first=getGuest(0); if(!first)return;
  const firstType=first.querySelector('[data-f="tipologia"]')?.value;
- const forced=firstType==="capo_famiglia"?"familiare":firstType==="capo_gruppo"?"membro_gruppo":null;
+ const forced=firstType==="capo_famiglia"?"familiare":firstType==="capo_gruppo"?"membro_gruppo":"ospite_singolo";
  document.querySelectorAll('.guest').forEach((g,i)=>{
-   if(i===0||!forced)return;
-   const sel=g.querySelector('[data-f="tipologia"]');
-   if(sel){sel.value=forced;}
+   if(i===0)return;
+   const field=g.querySelector('[data-f="tipologia"]');
+   if(field)field.value=forced;
  });
 }
 function updateGuestType(index){
  const g=getGuest(index); if(!g)return;
- const type=g.querySelector('[data-f="tipologia"]')?.value||"ospite_singolo";
- g.querySelectorAll(".doc-field").forEach(el=>el.classList.toggle("hidden",type==="familiare"||type==="membro_gruppo"));
  if(index===0) applyHeadGuestRule();
 }
-function markBirthplaceManual(index){const g=getGuest(index);if(g)g.dataset.birthplaceManual="1";}
-function syncBirthplaceFromNationality(index){const g=getGuest(index);if(!g||g.dataset.birthplaceManual==="1")return;const c=g.querySelector('[data-f="cittadinanza"]')?.value?.trim();const b=g.querySelector('[data-f="luogo_nascita"]');if(c&&b&&!b.value.trim())b.value=c;}
-
+function markBirthplaceManual(index){
+ const g=getGuest(index); if(!g)return;
+ const b=g.querySelector('[data-f="luogo_nascita"]');
+ if(b && b.value.trim()!==String(g.dataset.birthplaceAutoValue||"").trim()) g.dataset.birthplaceManual="1";
+}
+function syncBirthplaceFromNationality(index){
+ const g=getGuest(index);if(!g)return;
+ const c=g.querySelector('[data-f="cittadinanza"]')?.value?.trim();
+ const b=g.querySelector('[data-f="luogo_nascita"]');
+ if(!b||g.dataset.birthplaceManual==="1")return;
+ if(c){b.value=c;g.dataset.birthplaceAutoValue=c;}
+}
 function collectGuests(){
  return [...document.querySelectorAll(".guest")].map(g=>{
    const o=Object.fromEntries([...g.querySelectorAll("[data-f]")].map(x=>[x.dataset.f,x.value]));
@@ -144,7 +155,6 @@ function collectGuests(){
  });
 }
 async function saveStay(){setNightsFromDates();if(!arrival.value||!departure.value||Number(nights.value)<1){show("saveMsg","Controlla arrivo e partenza: la partenza deve essere successiva all'arrivo.");return}const gs=collectGuests();const r=await api("/api/stays",{method:"POST",body:JSON.stringify({arrival:arrival.value,nights:Number(nights.value),departure:departure.value,guests:gs})});const j=await r.json();show("saveMsg",j.ok?`Check-in salvato. ID ${j.id}`:(j.error||"Errore")); if(j.ok){document.getElementById("sendBox").classList.remove("hidden");window.lastStayId=j.id}}
-async function testService(s){const r=await api("/api/test/"+s,{method:"POST"});const j=await r.json();show("serviceMsg",j.ok?j.message:(j.error||"Test non riuscito"))}
 
 function mrzDate(v){if(!/^[0-9]{6}$/.test(v))return "";const yy=Number(v.slice(0,2)),mm=v.slice(2,4),dd=v.slice(4,6);const year=yy>=50?1900+yy:2000+yy;return `${year}-${mm}-${dd}`}
 

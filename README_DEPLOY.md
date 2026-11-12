@@ -1,33 +1,18 @@
-# CheckIn Lazio V8
+# CheckIn Lazio — V16
 
-V8 aggiunge un pulsante **Verifica ROSS 1000** nella sezione Trasmissioni.
-Il controllo verifica la configurazione e raggiungibilità dell'endpoint ROSS senza inviare alcun movimento.
+## Modifiche principali
+- Dati generali: data di arrivo, numero pernottamenti e data di partenza calcolata automaticamente.
+- Ospite 1: tipologia, cittadinanza, luogo di nascita, cognome, nome, data di nascita, sesso, tipologia documento, luogo di rilascio e numero documento.
+- Ospiti successivi: tipologia automatica, cittadinanza, luogo di nascita, cognome, nome, data di nascita e sesso. I campi documento non vengono mostrati.
+- Se Ospite 1 è Capo famiglia, gli ospiti successivi diventano automaticamente Familiari.
+- Se Ospite 1 è Capo gruppo, gli ospiti successivi diventano automaticamente Membri gruppo.
+- Ogni ospite ha il proprio pulsante di scansione e una schermata dedicata alla fotocamera.
+- Scansione disponibile in modalità MRZ e OCR CIE.
+- Il luogo di nascita viene precompilato con la cittadinanza finché l'utente non lo modifica manualmente.
 
-## Environment
-- ADMIN_USER
-- ADMIN_PASSWORD
-- SESSION_SECRET
-- ALLOGGIATI_USER
-- ALLOGGIATI_PASSWORD
-- ALLOGGIATI_WSKEY
-- ROSS_USER
-- ROSS_PASSWORD
-- ROSS_STRUCTURE_CODE
-- ROSS_ENDPOINT=https://lazioturismo.ross1000.it/ws/checkinV2
-
-Il pulsante **Invia a ROSS 1000** resta disponibile dopo il salvataggio di un soggiorno e costituisce invece l'invio della movimentazione.
-
-V9
-- Corretto il test ROSS 1000: la V8 faceva una GET diretta su /ws/checkinV2, che può restituire HTTP 500 perché il servizio è SOAP e richiede POST.
-- Il test V9 interroga il WSDL /ws/checkinV2?wsdl con Basic Authentication.
-- Il test non invia alcun movimento turistico.
-
-V10
-- Corretto un errore di sintassi JavaScript introdotto nel test ROSS 1000 della V9.
-- Il test ROSS ora può essere avviato senza l'errore "Invalid regular expression flags".
-
-V12
-- Ripristinata la struttura del blocco MRZ della V10, che era funzionante.
-- Aggiunta la Tipologia Alloggiato e i campi documento senza modificare il ciclo di avvio del lettore MRZ.
-- Ogni ospite mantiene il proprio indice e il proprio pulsante di scansione.
-- Per Familiare/Membro gruppo i campi documento sono nascosti e rimossi dal payload.
+## Deploy
+1. Estrai lo ZIP.
+2. Carica/sostituisci i file nel repository GitHub `SuperStefanoApp/checkin-lazio`.
+3. Commit changes.
+4. Attendi il redeploy automatico di Render.
+5. Apri il link Render e verifica prima il login, poi un nuovo check-in.
