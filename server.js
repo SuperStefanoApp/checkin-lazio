@@ -179,13 +179,39 @@ app.post("/api/test/alloggiati",async(req,res)=>{
 });
 app.post("/api/test/ross1000",async(req,res)=>{
   try{
-    if(!process.env.ROSS_USER||!process.env.ROSS_PASSWORD||!process.env.ROSS_STRUCTURE_CODE) throw new Error("ROSS 1000 non configurato: servono ROSS_USER, ROSS_PASSWORD e ROSS_STRUCTURE_CODE.");
-    const endpoint=process.env.ROSS_ENDPOINT||"https://lazioturismo.ross1000.it/ws/checkinV2";
+    if(!process.env.ROSS_USER||!process.env.ROSS_PASSWORD||!process.env.ROSS_STRUCTURE_CODE)
+      throw new Error("ROSS 1000 non configurato: servono ROSS_USER, ROSS_PASSWORD e ROSS_STRUCTURE_CODE.");
+    const endpoint=(process.env.ROSS_ENDPOINT||"https://lazioturismo.ross1000.it/ws/checkinV2").replace(/\\/$/,"");
+    const wsdl=endpoint+"?wsdl";
     const auth=Buffer.from(`${process.env.ROSS_USER}:${process.env.ROSS_PASSWORD}`).toString("base64");
-    const r=await fetch(endpoint,{method:"GET",headers:{Authorization:`Basic ${auth}`,"User-Agent":"CheckIn-Lazio/1.0"}});
+    const r=await fetch(wsdl,{method:"GET",headers:{
+      Authorization:`Basic ${auth}`,
+      Accept:"text/xml, application/xml",
+      "User-Agent":"CheckIn-Lazio/1.0"
+    }});
     const text=await r.text();
-    res.json({ok:r.status!==401&&r.status!==403,endpoint,http_status:r.status,message:r.status===401||r.status===403?"Endpoint raggiunto, ma ROSS ha rifiutato l'autenticazione.":"Endpoint ROSS raggiungibile. La risposta HTTP non rappresenta un invio di movimentazione.",detail:text.slice(0,500)});
-  }catch(e){res.status(502).json({ok:false,error:String(e.message||e)})}
+    if(r.status===401||r.status===403){
+      return res.status(502).json({
+        ok:false, endpoint, http_status:r.status,
+        message:"Endpoint ROSS raggiunto, ma le credenziali HTTP Basic sono state rifiutate.",
+        detail:text.slice(0,500)
+      });
+    }
+    if(r.status>=200 && r.status<300){
+      return res.json({
+        ok:true, endpoint, wsdl:true, http_status:r.status,
+        message:"Endpoint ROSS 1000 raggiungibile e WSDL disponibile. Nessun movimento è stato inviato.",
+        detail:text.slice(0,500)
+      });
+    }
+    return res.status(502).json({
+      ok:false, endpoint, http_status:r.status,
+      message:"Endpoint ROSS raggiunto ma ha restituito una risposta non prevista. Nessun movimento è stato inviato.",
+      detail:text.slice(0,500)
+    });
+  }catch(e){
+    res.status(502).json({ok:false,error:String(e.message||e)})
+  }
 });
 app.post("/api/submit/:service/:stayId",async(req,res)=>{
   const service=req.params.service;

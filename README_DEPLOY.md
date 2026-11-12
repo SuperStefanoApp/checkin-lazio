@@ -16,3 +16,8 @@ Il controllo verifica la configurazione e raggiungibilità dell'endpoint ROSS se
 - ROSS_ENDPOINT=https://lazioturismo.ross1000.it/ws/checkinV2
 
 Il pulsante **Invia a ROSS 1000** resta disponibile dopo il salvataggio di un soggiorno e costituisce invece l'invio della movimentazione.
+
+V9
+- Corretto il test ROSS 1000: la V8 faceva una GET diretta su /ws/checkinV2, che può restituire HTTP 500 perché il servizio è SOAP e richiede POST.
+- Il test V9 interroga il WSDL /ws/checkinV2?wsdl con Basic Authentication.
+- Il test non invia alcun movimento turistico.
