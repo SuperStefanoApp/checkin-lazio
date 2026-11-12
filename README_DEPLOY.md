@@ -25,3 +25,10 @@ V9
 V10
 - Corretto un errore di sintassi JavaScript introdotto nel test ROSS 1000 della V9.
 - Il test ROSS ora può essere avviato senza l'errore "Invalid regular expression flags".
+
+V11
+- Ogni ospite ha una Tipologia Alloggiato: Ospite singolo, Capo famiglia, Capo gruppo, Familiare, Membro gruppo.
+- La scansione MRZ è disponibile per ogni ospite, indipendentemente dalla tipologia, e compila automaticamente i dati leggibili.
+- Per Familiare/Membro gruppo i tre campi documento vengono nascosti e rimossi dal payload della schedina Alloggiati.
+- Per gli ospiti con documento richiesto sono presenti Tipologia documento, Luogo di rilascio e Numero documento.
+- Il luogo di rilascio non viene ricavato dalla MRZ perché la MRZ non contiene il comune/luogo di rilascio: resta compilabile manualmente.
