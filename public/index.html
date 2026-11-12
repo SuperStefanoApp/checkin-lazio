@@ -64,6 +64,7 @@
 <script>
 let token=localStorage.getItem("checkin_token")||"";
 let mrzReader=null;
+let mrzStarting=false;
 const COUNTRY_NAMES = {"ABW": "Aruba", "AFG": "Afghanistan", "AGO": "Angola", "AIA": "Anguilla", "ALA": "Isole Åland", "ALB": "Albania", "AND": "Andorra", "ARE": "Emirati Arabi Uniti", "ARG": "Argentina", "ARM": "Armenia", "ASM": "Samoa Americane", "ATA": "Antartide", "ATF": "Terre Australi Francesi", "ATG": "Antigua e Barbuda", "AUS": "Australia", "AUT": "Austria", "AZE": "Azerbaigian", "BDI": "Burundi", "BEL": "Belgio", "BEN": "Benin", "BES": "Caraibi Olandesi", "BFA": "Burkina Faso", "BGD": "Bangladesh", "BGR": "Bulgaria", "BHR": "Bahrein", "BHS": "Bahamas", "BIH": "Bosnia ed Erzegovina", "BLM": "Saint-Barthélemy", "BLR": "Bielorussia", "BLZ": "Belize", "BMU": "Bermuda", "BOL": "Bolivia", "BRA": "Brasile", "BRB": "Barbados", "BRN": "Brunei", "BTN": "Bhutan", "BVT": "Isola Bouvet", "BWA": "Botswana", "CAF": "Repubblica Centrafricana", "CAN": "Canada", "CCK": "Isole Cocos (Keeling)", "CHE": "Svizzera", "CHL": "Cile", "CHN": "Cina", "CIV": "Costa d’Avorio", "CMR": "Camerun", "COD": "Congo - Kinshasa", "COG": "Congo-Brazzaville", "COK": "Isole Cook", "COL": "Colombia", "COM": "Comore", "CPV": "Capo Verde", "CRI": "Costa Rica", "CUB": "Cuba", "CUW": "Curaçao", "CXR": "Isola Christmas", "CYM": "Isole Cayman", "CYP": "Cipro", "CZE": "Cechia", "DEU": "Germania", "DJI": "Gibuti", "DMA": "Dominica", "DNK": "Danimarca", "DOM": "Repubblica Dominicana", "DZA": "Algeria", "ECU": "Ecuador", "EGY": "Egitto", "ERI": "Eritrea", "ESH": "Sahara Occidentale", "ESP": "Spagna", "EST": "Estonia", "ETH": "Etiopia", "FIN": "Finlandia", "FJI": "Figi", "FLK": "Isole Falkland", "FRA": "Francia", "FRO": "Isole Fær Øer", "FSM": "Micronesia", "GAB": "Gabon", "GBR": "Regno Unito", "GEO": "Georgia", "GGY": "Guernsey", "GHA": "Ghana", "GIB": "Gibilterra", "GIN": "Guinea", "GLP": "Guadalupa", "GMB": "Gambia", "GNB": "Guinea-Bissau", "GNQ": "Guinea Equatoriale", "GRC": "Grecia", "GRD": "Grenada", "GRL": "Groenlandia", "GTM": "Guatemala", "GUF": "Guyana Francese", "GUM": "Guam", "GUY": "Guyana", "HKG": "RAS di Hong Kong", "HMD": "Isole Heard e McDonald", "HND": "Honduras", "HRV": "Croazia", "HTI": "Haiti", "HUN": "Ungheria", "IDN": "Indonesia", "IMN": "Isola di Man", "IND": "India", "IOT": "Territorio Britannico dell’Oceano Indiano", "IRL": "Irlanda", "IRN": "Iran", "IRQ": "Iraq", "ISL": "Islanda", "ISR": "Israele", "ITA": "Italia", "JAM": "Giamaica", "JEY": "Jersey", "JOR": "Giordania", "JPN": "Giappone", "KAZ": "Kazakistan", "KEN": "Kenya", "KGZ": "Kirghizistan", "KHM": "Cambogia", "KIR": "Kiribati", "KNA": "Saint Kitts e Nevis", "KOR": "Corea del Sud", "KWT": "Kuwait", "LAO": "Laos", "LBN": "Libano", "LBR": "Liberia", "LBY": "Libia", "LCA": "Saint Lucia", "LIE": "Liechtenstein", "LKA": "Sri Lanka", "LSO": "Lesotho", "LTU": "Lituania", "LUX": "Lussemburgo", "LVA": "Lettonia", "MAC": "RAS di Macao", "MAF": "Saint Martin", "MAR": "Marocco", "MCO": "Monaco", "MDA": "Moldavia", "MDG": "Madagascar", "MDV": "Maldive", "MEX": "Messico", "MHL": "Isole Marshall", "MKD": "Macedonia del Nord", "MLI": "Mali", "MLT": "Malta", "MMR": "Myanmar (Birmania)", "MNE": "Montenegro", "MNG": "Mongolia", "MNP": "Isole Marianne Settentrionali", "MOZ": "Mozambico", "MRT": "Mauritania", "MSR": "Montserrat", "MTQ": "Martinica", "MUS": "Mauritius", "MWI": "Malawi", "MYS": "Malaysia", "MYT": "Mayotte", "NAM": "Namibia", "NCL": "Nuova Caledonia", "NER": "Niger", "NFK": "Isola Norfolk", "NGA": "Nigeria", "NIC": "Nicaragua", "NIU": "Niue", "NLD": "Paesi Bassi", "NOR": "Norvegia", "NPL": "Nepal", "NRU": "Nauru", "NZL": "Nuova Zelanda", "OMN": "Oman", "PAK": "Pakistan", "PAN": "Panama", "PCN": "Isole Pitcairn", "PER": "Perù", "PHL": "Filippine", "PLW": "Palau", "PNG": "Papua Nuova Guinea", "POL": "Polonia", "PRI": "Portorico", "PRK": "Corea del Nord", "PRT": "Portogallo", "PRY": "Paraguay", "PSE": "Territori Palestinesi", "PYF": "Polinesia Francese", "QAT": "Qatar", "REU": "Riunione", "ROU": "Romania", "RUS": "Russia", "RWA": "Ruanda", "SAU": "Arabia Saudita", "SDN": "Sudan", "SEN": "Senegal", "SGP": "Singapore", "SGS": "Georgia del Sud e Sandwich Australi", "SHN": "Sant’Elena", "SJM": "Svalbard e Jan Mayen", "SLB": "Isole Salomone", "SLE": "Sierra Leone", "SLV": "El Salvador", "SMR": "San Marino", "SOM": "Somalia", "SPM": "Saint-Pierre e Miquelon", "SRB": "Serbia", "SSD": "Sud Sudan", "STP": "São Tomé e Príncipe", "SUR": "Suriname", "SVK": "Slovacchia", "SVN": "Slovenia", "SWE": "Svezia", "SWZ": "Eswatini", "SXM": "Sint Maarten", "SYC": "Seychelles", "SYR": "Siria", "TCA": "Isole Turks e Caicos", "TCD": "Ciad", "TGO": "Togo", "THA": "Thailandia", "TJK": "Tagikistan", "TKL": "Tokelau", "TKM": "Turkmenistan", "TLS": "Timor Est", "TON": "Tonga", "TTO": "Trinidad e Tobago", "TUN": "Tunisia", "TUR": "Turchia", "TUV": "Tuvalu", "TWN": "Taiwan", "TZA": "Tanzania", "UGA": "Uganda", "UKR": "Ucraina", "UMI": "Isole Minori Esterne degli Stati Uniti", "URY": "Uruguay", "USA": "Stati Uniti", "UZB": "Uzbekistan", "VAT": "Città del Vaticano", "VCT": "Saint Vincent e Grenadine", "VEN": "Venezuela", "VGB": "Isole Vergini Britanniche", "VIR": "Isole Vergini Americane", "VNM": "Vietnam", "VUT": "Vanuatu", "WLF": "Wallis e Futuna", "WSM": "Samoa", "XKX": "Kosovo", "YEM": "Yemen", "ZAF": "Sudafrica", "ZMB": "Zambia", "ZWE": "Zimbabwe"};
 function countryName(code){const c=String(code||"").trim().toUpperCase(); return COUNTRY_NAMES[c]||c;}
 
@@ -136,10 +137,16 @@ async function loadMrzLibrary(){
 }
 
 async function startMrzScanner(){
+ if(mrzStarting)return;
+ mrzStarting=true;
  document.getElementById("mrzPanel").classList.remove("hidden");
  try{
+   // Cleanly dispose of any previous reader before opening the camera again.
+   if(mrzReader){try{mrzReader.stop()}catch(e){} mrzReader=null}
+   const host=document.getElementById("mrz-reader");
+   host.innerHTML="";
+   await new Promise(r=>setTimeout(r,350));
    const {initMRZReader}=await loadMrzLibrary();
-   if(mrzReader){try{mrzReader.stop()}catch(e){}}
    mrzReader=initMRZReader({
      container:"#mrz-reader",
      workerPath:"https://cdn.jsdelivr.net/npm/tesseract.js@5.1.1/dist/worker.min.js",
@@ -153,7 +160,7 @@ async function startMrzScanner(){
          show("mrzMsg",`✓ Documento di Ospite ${activeGuestIndex+1} letto e verificato. I dati sono stati inseriti in questo ospite.`);
          document.getElementById("docResult").className="result-box";
          document.getElementById("docResult").textContent=`Documento riconosciuto e assegnato a Ospite ${activeGuestIndex+1}. Controlla i dati prima di salvare.`;
-         setTimeout(()=>stopMrzScanner(),800);
+         setTimeout(()=>stopMrzScanner(),500);
        }else{
          show("mrzMsg","Documento letto, ma i controlli MRZ non sono tutti validi. Riprova mantenendo nitide e complete le righe MRZ.");
        }
@@ -163,13 +170,22 @@ async function startMrzScanner(){
    await mrzReader.capture();
  }catch(e){
    show("mrzMsg","Impossibile avviare il lettore MRZ. Verifica di aver autorizzato la fotocamera e che il browser sia aggiornato.");
+ }finally{
+   mrzStarting=false;
  }
 }
 async function captureMrz(){
  if(!mrzReader){await startMrzScanner();return}
  try{await mrzReader.capture()}catch(e){show("mrzMsg","Acquisizione non riuscita. Riprova tenendo ferme le righe MRZ nell'area indicata.")}
 }
-function stopMrzScanner(){if(mrzReader){try{mrzReader.stop()}catch(e){}mrzReader=null}document.getElementById("mrzPanel").classList.add("hidden")}
+async function stopMrzScanner(){
+ if(mrzReader){try{mrzReader.stop()}catch(e){} mrzReader=null}
+ const host=document.getElementById("mrz-reader");
+ if(host)host.innerHTML="";
+ document.getElementById("mrzPanel").classList.add("hidden");
+ // Give iOS/Safari time to release the previous MediaStream before the next guest.
+ await new Promise(r=>setTimeout(r,350));
+}
 
 function showHistory(){api("/api/stays").then(r=>r.json()).then(rows=>show("serviceMsg",`Storico: ${rows.length} soggiorni presenti.`))}
 
