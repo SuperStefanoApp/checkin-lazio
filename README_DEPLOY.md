@@ -1,39 +1,14 @@
-# CheckIn Lazio Cloud
+# CheckIn Lazio Cloud V4
 
-Questa è la versione cloud/PWA. Il telefono non deve avere Node.js: Node viene eseguito solo sul server.
+Questa versione corregge due aspetti della V3:
 
-## Deploy consigliato: Render
+1. **Calcolo date**: il calcolo usa date di calendario locali e non `toISOString()`, evitando lo spostamento di un giorno dovuto al fuso orario. Esempio: arrivo 12/11 + 3 notti = partenza 15/11.
+2. **Lettura documento**: sostituito l'OCR generico della fotografia con un lettore MRZ dedicato (`web-mrz-reader`), progettato per MRZ TD1/TD2/TD3. La lettura e il parsing avvengono sul dispositivo; i check digit della MRZ vengono usati per rifiutare letture incoerenti. Il browser deve avere accesso alla fotocamera e deve essere in HTTPS.
 
-1. Crea un repository GitHub e carica tutti i file di questa cartella.
-2. Su Render crea un nuovo Web Service dal repository.
-3. Il file `render.yaml` è già predisposto.
-4. Imposta le variabili:
-   - ADMIN_USER
-   - ADMIN_PASSWORD
-   - ALLOGGIATI_USER
-   - ALLOGGIATI_PASSWORD
-   - ALLOGGIATI_WSKEY
-   - ROSS_USER
-   - ROSS_PASSWORD
-   - ROSS_STRUCTURE_CODE
-5. Deploy.
-6. Apri l'URL HTTPS dal telefono e aggiungilo alla schermata Home.
+## Deploy
 
-## Sicurezza
+Il progetto mantiene la stessa struttura e lo stesso servizio Render. Caricare tutti i file nella repository GitHub esistente `checkin-lazio` e fare commit. Render eseguirà automaticamente il nuovo deploy se `autoDeploy` è attivo.
 
-Le credenziali dei servizi pubblici restano sul backend. Non vanno inserite nel JavaScript del telefono.
+## Nota importante sulla MRZ
 
-## Alloggiati Web
-
-Il backend usa il Web Service ufficiale e implementa `GenerateToken`. Prima di abilitare l'invio reale va completata e verificata la mappatura dei campi/schedine della specifica della struttura.
-
-## ROSS 1000 Lazio
-
-Endpoint preconfigurato:
-https://lazioturismo.ross1000.it/ws/checkinV2
-
-Il codice struttura e le credenziali WS sono variabili server.
-
-## Nota importante
-
-Questa build è una base cloud realmente deployabile, ma non deve essere usata per trasmissioni reali finché non viene completata la mappatura ufficiale dei campi Alloggiati e del metodo SOAP/XML ROSS 1000 della Regione Lazio. Non sono state inventate chiamate o tracciati per simulare un invio riuscito.
+La MRZ non è il chip NFC del documento. Questa versione legge la **zona a lettura ottica** stampata sul documento. La lettura del chip elettronico NFC richiede una tecnologia diversa e, in particolare su iPhone/Safari, non è disponibile come semplice funzione Web standard. Se in seguito vorremo leggere anche il chip NFC, servirà valutare un'app nativa/SDK dedicato.

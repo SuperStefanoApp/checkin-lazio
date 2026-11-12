@@ -6,10 +6,10 @@
 <meta name="theme-color" content="#123b5d">
 <link rel="manifest" href="/manifest.json">
 <title>CheckIn Lazio</title>
-<script src="https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js"></script>
 <style>
 :root{font-family:system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;color:#163047;background:#f4f7fa}
-*{box-sizing:border-box}body{margin:0}.top{background:#123b5d;color:#fff;padding:18px 20px;position:sticky;top:0;z-index:5}.top h1{margin:0;font-size:22px}.wrap{max-width:900px;margin:0 auto;padding:18px}.card{background:#fff;border-radius:16px;padding:18px;margin-bottom:16px;box-shadow:0 2px 12px #00000012}.grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px}@media(max-width:650px){.grid{grid-template-columns:1fr}}label{font-weight:600;font-size:13px;display:block;margin-bottom:6px}input,button,select{width:100%;padding:12px;border:1px solid #ccd6df;border-radius:10px;font-size:16px}button{background:#123b5d;color:#fff;border:0;font-weight:700;cursor:pointer}.secondary{background:#e9eef3;color:#123b5d}.danger{background:#a62929}.guest{border:1px solid #dce4eb;border-radius:12px;padding:14px;margin:12px 0}.row{display:flex;gap:10px;align-items:center}.row>*{flex:1}.status{padding:10px;border-radius:10px;background:#eef5fa;margin-top:12px}.small{font-size:12px;color:#617487}.hidden{display:none}.pill{display:inline-block;padding:5px 9px;border-radius:999px;background:#e9eef3;font-size:12px}
+*{box-sizing:border-box}body{margin:0}.top{background:#123b5d;color:#fff;padding:18px 20px;position:sticky;top:0;z-index:5}.top h1{margin:0;font-size:22px}.wrap{max-width:900px;margin:0 auto;padding:18px}.card{background:#fff;border-radius:16px;padding:18px;margin-bottom:16px;box-shadow:0 2px 12px #00000012}.grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px}@media(max-width:650px){.grid{grid-template-columns:1fr}}label{font-weight:600;font-size:13px;display:block;margin-bottom:6px}input,button,select{width:100%;padding:12px;border:1px solid #ccd6df;border-radius:10px;font-size:16px}input[readonly]{background:#f2f5f7}button{background:#123b5d;color:#fff;border:0;font-weight:700;cursor:pointer}.secondary{background:#e9eef3;color:#123b5d}.danger{background:#a62929}.guest{border:1px solid #dce4eb;border-radius:12px;padding:14px;margin:12px 0}.row{display:flex;gap:10px;align-items:center}.row>*{flex:1}.status{padding:10px;border-radius:10px;background:#eef5fa;margin-top:12px}.small{font-size:12px;color:#617487}.hidden{display:none}.pill{display:inline-block;padding:5px 9px;border-radius:999px;background:#e9eef3;font-size:12px}
+#mrz-reader{width:100%;max-width:888px;margin-top:12px;border-radius:14px;overflow:hidden;background:#0b1116;min-height:280px}.scan-note{background:#eef5fa;padding:12px;border-radius:10px;margin-top:10px;font-size:13px;color:#40566a}.scan-actions{display:flex;gap:10px;margin-top:12px}.scan-actions button{flex:1}.result-box{margin-top:12px;padding:12px;border-radius:10px;background:#eef8ef;border:1px solid #cde7d0}.warning-box{margin-top:12px;padding:12px;border-radius:10px;background:#fff6e8;border:1px solid #f0d7a8}
 </style>
 </head>
 <body>
@@ -26,23 +26,27 @@
 <h2>Nuovo check-in</h2>
 <div class="grid">
 <div><label>Arrivo</label><input id="arrival" type="date"></div>
-<div><label>Partenza</label><input id="departure" type="date"></div>
+<div><label>Partenza</label><input id="departure" type="date" readonly></div>
 <div><label>Notti</label><input id="nights" type="number" min="1" value="1"></div>
 <div><label>Numero ospiti</label><input id="party" type="number" min="1" value="1" onchange="syncGuests()"></div>
 </div>
-<div class="small" style="margin-top:8px">Le notti sono calcolate come differenza tra arrivo e partenza: arrivo 12/11 e partenza 14/11 = 2 notti.</div>
+<div class="small" style="margin-top:8px">La partenza è il giorno successivo all'ultima notte: 12/11 + 3 notti = 15/11. La differenza tra arrivo e partenza coincide con il numero di notti.</div>
 <div id="guests"></div>
 <div class="row" style="margin-top:10px"><button class="secondary" onclick="addManual()">+ Inserisci manualmente</button><button onclick="saveStay()">Salva check-in</button></div>
 <div id="saveMsg" class="status hidden"></div>
 </div>
 
 <div class="card">
-<h2>Scansione documento</h2>
-<p class="small">Fotografa la carta d'identità elettronica o il passaporto. L'app esegue OCR e, quando presente, legge la MRZ. I dati trovati vengono riportati nella scheda dell'ospite e restano sempre modificabili.</p>
-<div class="row"><button type="button" onclick="document.getElementById('doc').click()">📷 Scansiona documento</button><button type="button" class="secondary" onclick="clearScan()">Cancella</button></div>
-<input id="doc" type="file" accept="image/*" capture="environment" onchange="scanDoc()" style="display:none">
-<img id="docPreview" class="hidden" style="width:100%;max-height:320px;object-fit:contain;margin-top:12px;border-radius:12px" alt="Anteprima documento">
-<div id="ocrMsg" class="status hidden"></div>
+<h2>Lettura documento</h2>
+<p class="small"><strong>Questa versione non usa più l'OCR generico della fotografia.</strong> Utilizza una lettura MRZ dedicata ai documenti ICAO (passaporti e carte d'identità con zona a lettura ottica). La lettura avviene direttamente sul dispositivo. Il sistema controlla anche i caratteri di verifica della MRZ prima di compilare i dati.</p>
+<button type="button" onclick="startMrzScanner()">📷 Leggi MRZ con fotocamera</button>
+<div id="mrzPanel" class="hidden">
+  <div id="mrz-reader"></div>
+  <div class="scan-note">Posiziona <strong>la parte inferiore del documento</strong>, dove sono presenti le 2 o 3 righe composte da lettere, numeri e simboli &lt;, dentro l'area di scansione. Non fotografare semplicemente il documento intero.</div>
+  <div class="scan-actions"><button type="button" class="secondary" onclick="captureMrz()" id="mrzCapture">Leggi documento</button><button type="button" class="secondary" onclick="stopMrzScanner()">Chiudi</button></div>
+  <div id="mrzMsg" class="status hidden"></div>
+</div>
+<div id="docResult" class="hidden"></div>
 </div>
 
 <div class="card">
@@ -57,88 +61,112 @@
 </div>
 </section>
 </div>
+
 <script>
 let token=localStorage.getItem("checkin_token")||"";
+let mrzReader=null;
+
 function api(path,opt={}){opt.headers={...(opt.headers||{}),Authorization:"Bearer "+token,"Content-Type":"application/json"};return fetch(path,opt)}
 function show(id,msg){const e=document.getElementById(id);e.textContent=msg;e.classList.remove("hidden")}
+
 async function login(){const r=await fetch("/api/login",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({username:user.value,password:pass.value})});const j=await r.json();if(j.ok){token=j.token;localStorage.setItem("checkin_token",token);document.getElementById("login").classList.add("hidden");document.getElementById("app").classList.remove("hidden");syncGuests();setDepartureFromNights()}else show("loginMsg",j.error||"Accesso negato")}
-function dateDiff(a,b){if(!a||!b)return null;const A=new Date(a+"T00:00:00"),B=new Date(b+"T00:00:00");return Math.round((B-A)/86400000)}
-function setDepartureFromNights(){if(!arrival.value)return;const n=Number(nights.value||0);if(n<1)return;const d=new Date(arrival.value+"T00:00:00");d.setDate(d.getDate()+n);departure.value=d.toISOString().slice(0,10)}
+
+// Date handling deliberately avoids toISOString(), which converts midnight to UTC and
+// can shift an Italian calendar date back by one day.
+function dateDiff(a,b){
+ if(!a||!b)return null;
+ const [ay,am,ad]=a.split("-").map(Number), [by,bm,bd]=b.split("-").map(Number);
+ const A=Date.UTC(ay,am-1,ad), B=Date.UTC(by,bm-1,bd);
+ return Math.round((B-A)/86400000);
+}
+function addDays(dateStr,n){
+ const [y,m,d]=dateStr.split("-").map(Number);
+ const dt=new Date(y,m-1,d);
+ dt.setDate(dt.getDate()+n);
+ const yy=dt.getFullYear(), mm=String(dt.getMonth()+1).padStart(2,"0"), dd=String(dt.getDate()).padStart(2,"0");
+ return `${yy}-${mm}-${dd}`;
+}
+function setDepartureFromNights(){if(!arrival.value)return;const n=Number(nights.value||0);if(n<1)return;departure.value=addDays(arrival.value,n)}
 function setNightsFromDates(){const n=dateDiff(arrival.value,departure.value);if(n!==null&&n>=1)nights.value=n}
-function guestHtml(i){return `<div class="guest"><div class="pill">Ospite ${i}</div><div class="grid" style="margin-top:10px"><div><label>Nome</label><input data-f="nome"></div><div><label>Cognome</label><input data-f="cognome"></div><div><label>Data di nascita</label><input data-f="nascita" type="date"></div><div><label>Luogo di nascita</label><input data-f="luogo_nascita"></div><div><label>Sesso</label><select data-f="sesso"><option value="">Seleziona</option><option>M</option><option>F</option></select></div><div><label>Cittadinanza</label><input data-f="cittadinanza"></div><div><label>Tipo documento</label><input data-f="tipo_documento" placeholder="Carta identità / Passaporto"></div><div><label>Numero documento</label><input data-f="numero_documento"></div><div><label>Stato rilascio</label><input data-f="stato_documento"></div><div><label>Data arrivo</label><input data-f="arrivo" type="date"></div></div></div>`}
+
+function guestHtml(i){return `<div class="guest"><div class="pill">Ospite ${i}</div><div class="grid" style="margin-top:10px"><div><label>Nome</label><input data-f="nome"></div><div><label>Cognome</label><input data-f="cognome"></div><div><label>Data di nascita</label><input data-f="nascita" type="date"></div><div><label>Luogo di nascita</label><input data-f="luogo_nascita"></div><div><label>Sesso</label><select data-f="sesso"><option value="">Seleziona</option><option value="M">M</option><option value="F">F</option></select></div><div><label>Cittadinanza</label><input data-f="cittadinanza"></div><div><label>Tipo documento</label><input data-f="tipo_documento" placeholder="Carta identità / Passaporto"></div><div><label>Numero documento</label><input data-f="numero_documento"></div><div><label>Stato rilascio</label><input data-f="stato_documento"></div><div><label>Data arrivo</label><input data-f="arrivo" type="date"></div></div></div>`}
 function syncGuests(){let n=Math.max(1,Number(party.value||1));guests.innerHTML=Array.from({length:n},(_,i)=>guestHtml(i+1)).join("")}
 function addManual(){party.value=Number(party.value||0)+1;syncGuests();guests.lastElementChild?.scrollIntoView({behavior:"smooth"})}
 function collectGuests(){return [...document.querySelectorAll(".guest")].map(g=>Object.fromEntries([...g.querySelectorAll("[data-f]")].map(x=>[x.dataset.f,x.value])))}
 async function saveStay(){setNightsFromDates();if(!arrival.value||!departure.value||Number(nights.value)<1){show("saveMsg","Controlla arrivo e partenza: la partenza deve essere successiva all'arrivo.");return}const gs=collectGuests();const r=await api("/api/stays",{method:"POST",body:JSON.stringify({arrival:arrival.value,nights:Number(nights.value),departure:departure.value,guests:gs})});const j=await r.json();show("saveMsg",j.ok?`Check-in salvato. ID ${j.id}`:(j.error||"Errore"))}
 async function testService(s){const r=await api("/api/test/"+s,{method:"POST"});const j=await r.json();show("serviceMsg",j.ok?j.message:(j.error||"Test non riuscito"))}
-function mrzDate(v){if(!/^[0-9]{6}$/.test(v))return "";const yy=Number(v.slice(0,2)),mm=v.slice(2,4),dd=v.slice(4,6);const year=yy>=50?1900+yy:2000+yy;return `${year}-${mm}-${dd}`}
-function cleanMrzLine(s){return s.toUpperCase().replace(/[^A-Z0-9<]/g,"")}
-function parseMrz(text){
- const lines=text.toUpperCase().split(/\r?\n/).map(cleanMrzLine).filter(x=>x.length>=20);
- const candidates=[];
- for(let i=0;i<lines.length;i++){
-   if(lines[i].startsWith("P<")&&lines[i].length>=40&&lines[i+1]) candidates.push([lines[i],lines[i+1]]);
-   if(lines[i].length>=28&&lines[i+1]&&lines[i+1].length>=28&&!lines[i].startsWith("P<")) candidates.push([lines[i],lines[i+1],lines[i+2]||""]);
- }
- for(const c of candidates){
-   if(c.length===2){
-     const l1=c[0].padEnd(44,"<"),l2=c[1].padEnd(44,"<");
-     const doc=l2.slice(0,9).replace(/</g,"");
-     const nat=l2.slice(10,13).replace(/</g,"");
-     const dob=l2.slice(13,19);
-     const sex=l2.slice(20,21);
-     const exp=l2.slice(21,27);
-     const names=l1.slice(5).split("<<");
-     const surname=(names[0]||"").replace(/</g," ").trim();
-     const given=(names[1]||"").replace(/</g," ").trim();
-     return {tipo_documento:"Passaporto",numero_documento:doc,cittadinanza:nat,nascita:mrzDate(dob),sesso:sex==="M"||sex==="F"?sex:"",scadenza:mrzDate(exp),cognome:surname,nome:given};
-   }
-   if(c.length===3){
-     const l1=c[0].padEnd(30,"<"),l2=c[1].padEnd(30,"<"),l3=c[2].padEnd(30,"<");
-     const doc=l1.slice(5,14).replace(/</g,"");
-     const birth=l2.slice(0,6),sex=l2.slice(7,8),exp=l2.slice(8,14),nat=l2.slice(15,18).replace(/</g,"");
-     const names=l3.split("<<");
-     const surname=(names[0]||"").replace(/</g," ").trim();
-     const given=(names[1]||"").replace(/</g," ").trim();
-     return {tipo_documento:"Carta d'identità",numero_documento:doc,nascita:mrzDate(birth),sesso:sex==="M"||sex==="F"?sex:"",scadenza:mrzDate(exp),cittadinanza:nat,cognome:surname,nome:given};
-   }
- }
- return null;
-}
-function cropMrzImage(file){return new Promise((resolve,reject)=>{const img=new Image();img.onload=()=>{const canvas=document.createElement("canvas");canvas.width=img.naturalWidth;canvas.height=Math.floor(img.naturalHeight*0.48);const ctx=canvas.getContext("2d");ctx.drawImage(img,0,img.naturalHeight-canvas.height,img.naturalWidth,canvas.height,0,0,canvas.width,canvas.height);resolve(canvas)};img.onerror=reject;img.src=URL.createObjectURL(file)})}
 
-function applyDocData(data){const g=document.querySelector(".guest");if(!g)return;for(const [k,v] of Object.entries(data||{})){const el=g.querySelector(`[data-f="${k}"]`);if(el&&v)el.value=v}}
-async function scanDoc(){
- const f=doc.files[0];
- if(!f)return;
- const preview=document.getElementById("docPreview");
- preview.src=URL.createObjectURL(f);
- preview.classList.remove("hidden");
- show("ocrMsg","Analisi documento in corso…");
+function mrzDate(v){if(!/^[0-9]{6}$/.test(v))return "";const yy=Number(v.slice(0,2)),mm=v.slice(2,4),dd=v.slice(4,6);const year=yy>=50?1900+yy:2000+yy;return `${year}-${mm}-${dd}`}
+
+function applyMrzResult(result){
+ const p=result?.parsed;
+ if(!p || typeof p!=="object") return false;
+ const g=document.querySelector(".guest"); if(!g) return false;
+ const get=(...keys)=>{for(const k of keys){if(p[k]!=null&&String(p[k]).trim()!=="")return String(p[k]).trim()}return ""};
+ const sex=get("Gender");
+ const data={
+   nome:get("Given Names"),
+   cognome:get("Surname"),
+   nascita:mrzDate(get("Date of Birth")),
+   sesso:sex==="Male"?"M":sex==="Female"?"F":"",
+   cittadinanza:get("Nationality"),
+   tipo_documento:p["Passport Number"]?"Passaporto":"Carta d'identità",
+   numero_documento:get("Passport Number","Document Number"),
+   stato_documento:get("Issuing Country")
+ };
+ for(const [k,v] of Object.entries(data)){const el=g.querySelector(`[data-f="${k}"]`);if(el&&v)el.value=v}
+ const validation=p.Validation;
+ return validation?.isValid===true;
+}
+
+async function loadMrzLibrary(){
+ if(window.__mrzModule)return window.__mrzModule;
+ show("mrzMsg","Caricamento del lettore MRZ…");
+ // Dedicated MRZ reader: custom MRZ-trained model + TD1/TD2/TD3 parsing.
+ const mod=await import("https://esm.sh/web-mrz-reader@2.0.3");
+ window.__mrzModule=mod;
+ return mod;
+}
+
+async function startMrzScanner(){
+ document.getElementById("mrzPanel").classList.remove("hidden");
  try{
-   const full=await Tesseract.recognize(f,"ita+eng",{logger:m=>{if(m.status&&m.progress)show("ocrMsg",`OCR: ${m.status} ${Math.round(m.progress*100)}%`)}});
-   let text=full.data.text||"";
-   let data=parseMrz(text);
-   if(!data){
-     show("ocrMsg","Ricerca MRZ nella parte bassa del documento…");
-     const crop=await cropMrzImage(f);
-     const mrz=await Tesseract.recognize(crop,"eng",{config:{tessedit_char_whitelist:"ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789<",tessedit_pageseg_mode:"6"}});
-     text += "\n" + (mrz.data.text||"");
-     data=parseMrz(text);
-   }
-   if(data){
-     applyDocData(data);
-     show("ocrMsg","✓ MRZ riconosciuta. I dati sono stati compilati automaticamente. Controllali e modificali prima di salvare.");
-   }else{
-     show("ocrMsg","OCR completato, ma la MRZ non è stata riconosciuta con sufficiente affidabilità. I dati non vengono inventati: controllali e compilali/modificali manualmente.");
-   }
+   const {initMRZReader}=await loadMrzLibrary();
+   if(mrzReader){try{mrzReader.stop()}catch(e){}}
+   mrzReader=initMRZReader({
+     container:"#mrz-reader",
+     workerPath:"https://cdn.jsdelivr.net/npm/tesseract.js@5.1.1/dist/worker.min.js",
+     corePath:"https://cdn.jsdelivr.net/npm/tesseract.js-core@5.1.1/",
+     langPath:"https://cdn.jsdelivr.net/npm/web-mrz-reader@2.0.3/public/model/",
+     drawBoundingBoxes:true,
+     scanRegion:{left:0.05,top:0.52,width:0.90,height:0.40},
+     onResult:(result)=>{
+       const valid=applyMrzResult(result);
+       if(valid){
+         show("mrzMsg","✓ MRZ letta e verificata. I dati sono stati inseriti nell'ospite. Controllali prima di salvare.");
+         document.getElementById("docResult").className="result-box";
+         document.getElementById("docResult").textContent="Documento riconosciuto con controlli MRZ superati.";
+         setTimeout(()=>stopMrzScanner(),800);
+       }else{
+         show("mrzMsg","Documento letto, ma i controlli MRZ non sono tutti validi. Riprova mantenendo nitide e complete le righe MRZ.");
+       }
+     },
+     onError:(err)=>show("mrzMsg","Lettura MRZ: "+(err||"riprova con il documento più vicino e ben illuminato."))
+   });
+   await mrzReader.capture();
  }catch(e){
-   show("ocrMsg","OCR non disponibile o documento illeggibile. Puoi compilare i dati manualmente.");
+   show("mrzMsg","Impossibile avviare il lettore MRZ. Verifica di aver autorizzato la fotocamera e che il browser sia aggiornato.");
  }
 }
-function clearScan(){doc.value="";document.getElementById("docPreview").classList.add("hidden");document.getElementById("docPreview").removeAttribute("src");document.getElementById("ocrMsg").classList.add("hidden")}
+async function captureMrz(){
+ if(!mrzReader){await startMrzScanner();return}
+ try{await mrzReader.capture()}catch(e){show("mrzMsg","Acquisizione non riuscita. Riprova tenendo ferme le righe MRZ nell'area indicata.")}
+}
+function stopMrzScanner(){if(mrzReader){try{mrzReader.stop()}catch(e){}mrzReader=null}document.getElementById("mrzPanel").classList.add("hidden")}
+
 function showHistory(){api("/api/stays").then(r=>r.json()).then(rows=>show("serviceMsg",`Storico: ${rows.length} soggiorni presenti.`))}
-document.getElementById("arrival").addEventListener("change",()=>{if(departure.value)setNightsFromDates();else setDepartureFromNights()});
+
+document.getElementById("arrival").addEventListener("change",()=>setDepartureFromNights());
 document.getElementById("departure").addEventListener("change",setNightsFromDates);
 document.getElementById("nights").addEventListener("change",setDepartureFromNights);
 if(token){document.getElementById("login").classList.add("hidden");document.getElementById("app").classList.remove("hidden");syncGuests();setDepartureFromNights()}
