@@ -50,7 +50,7 @@
 
 <div class="card">
 <h2>Trasmissioni</h2>
-<div class="row"><button onclick="testService('alloggiati')">Test Alloggiati</button><button onclick="showHistory()">Storico</button></div><div id="sendBox" class="hidden" style="margin-top:12px"><div class="small">Dopo aver salvato il check-in, puoi inviare i dati ai due servizi separatamente.</div><div class="row" style="margin-top:10px"><button onclick="sendService('alloggiati')">Invia ad Alloggiati Web</button><button onclick="sendService('ross1000')">Invia a ROSS 1000</button></div></div>
+<div class="row"><button onclick="testService('alloggiati')">Test Alloggiati</button><button onclick="testService('ross1000')">Verifica ROSS 1000</button><button onclick="showHistory()">Storico</button></div><div id="sendBox" class="hidden" style="margin-top:12px"><div class="small">Dopo aver salvato il check-in, puoi inviare i dati ai due servizi separatamente.</div><div class="row" style="margin-top:10px"><button onclick="sendService('alloggiati')">Invia ad Alloggiati Web</button><button onclick="sendService('ross1000')">Invia a ROSS 1000</button></div></div>
 <div id="serviceMsg" class="status hidden"></div>
 </div>
 
@@ -186,6 +186,8 @@ async function stopMrzScanner(){
  // Give iOS/Safari time to release the previous MediaStream before the next guest.
  await new Promise(r=>setTimeout(r,350));
 }
+
+async function testService(service){show("serviceMsg",service==="alloggiati"?"Test Alloggiati in corso…":"Verifica endpoint ROSS 1000 in corso…");const r=await api(`/api/test/${service}`,{method:"POST"});const j=await r.json();if(j.ok){show("serviceMsg",service==="alloggiati"?"GenerateToken riuscito":"ROSS 1000: endpoint raggiungibile (HTTP "+j.http_status+"). Nessun movimento è stato inviato.")}else show("serviceMsg",j.error||j.detail||j.message||"Test non riuscito")}
 
 async function sendService(service){if(!window.lastStayId){show("serviceMsg","Prima salva il check-in.");return}show("serviceMsg",service==="alloggiati"?"Invio ad Alloggiati Web in corso…":"Invio a ROSS 1000 in corso…");const r=await api(`/api/submit/${service}/${window.lastStayId}`,{method:"POST"});const j=await r.json();if(j.ok){show("serviceMsg",service==="alloggiati"?`Alloggiati: ${j.valid}/${j.total} schedine accettate.`:(j.message||"ROSS 1000: invio riuscito."))}else show("serviceMsg",j.error||j.detail||"Invio non riuscito")}
 

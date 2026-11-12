@@ -177,6 +177,16 @@ app.post("/api/test/alloggiati",async(req,res)=>{
   try{const token=await alloggiatiGenerateToken();res.json({ok:true,message:"GenerateToken riuscito",token_valid:true});}
   catch(e){res.status(502).json({ok:false,error:String(e.message||e)})}
 });
+app.post("/api/test/ross1000",async(req,res)=>{
+  try{
+    if(!process.env.ROSS_USER||!process.env.ROSS_PASSWORD||!process.env.ROSS_STRUCTURE_CODE) throw new Error("ROSS 1000 non configurato: servono ROSS_USER, ROSS_PASSWORD e ROSS_STRUCTURE_CODE.");
+    const endpoint=process.env.ROSS_ENDPOINT||"https://lazioturismo.ross1000.it/ws/checkinV2";
+    const auth=Buffer.from(`${process.env.ROSS_USER}:${process.env.ROSS_PASSWORD}`).toString("base64");
+    const r=await fetch(endpoint,{method:"GET",headers:{Authorization:`Basic ${auth}`,"User-Agent":"CheckIn-Lazio/1.0"}});
+    const text=await r.text();
+    res.json({ok:r.status!==401&&r.status!==403,endpoint,http_status:r.status,message:r.status===401||r.status===403?"Endpoint raggiunto, ma ROSS ha rifiutato l'autenticazione.":"Endpoint ROSS raggiungibile. La risposta HTTP non rappresenta un invio di movimentazione.",detail:text.slice(0,500)});
+  }catch(e){res.status(502).json({ok:false,error:String(e.message||e)})}
+});
 app.post("/api/submit/:service/:stayId",async(req,res)=>{
   const service=req.params.service;
   const row=db.prepare("SELECT * FROM stays WHERE id=?").get(req.params.stayId);
