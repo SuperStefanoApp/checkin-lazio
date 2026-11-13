@@ -160,11 +160,20 @@ async function buildAlloggiatiRecords(stay){
   const luoghi=await alloggiatiTable(token,"Luoghi");
   const docs=await alloggiatiTable(token,"Tipi_Documento");
   const types=await alloggiatiTable(token,"Tipi_Alloggiato");
-  const type16=findCode(types,"Ospite Singolo")||"16";
+  const typeCodes={
+    ospite_singolo: findCode(types,"Ospite Singolo")||"16",
+    capo_famiglia: findCode(types,"Capo Famiglia")||"17",
+    capo_gruppo: findCode(types,"Capo Gruppo")||"18",
+    familiare: findCode(types,"Familiare")||"19",
+    membro_gruppo: findCode(types,"Membro Gruppo")||"20"
+  };
   const records=[];
   const problems=[];
   for(let i=0;i<stay.guests.length;i++){
     const g={...(stay.guests[i]||{})};
+    const guestType=String(g.tipologia||"ospite_singolo");
+    const typeCode=typeCodes[guestType]||typeCodes.ospite_singolo;
+    const isComponent=guestType==="familiare"||guestType==="membro_gruppo";
     // Per i cittadini stranieri Alloggiati richiede il Paese sia come stato
     // di nascita sia come luogo/stato di rilascio. Se l'interfaccia ha
     // compilato il campo automaticamente ma il browser non lo ha trasmesso,
@@ -180,14 +189,15 @@ async function buildAlloggiatiRecords(stay){
     const birthStateCode=findCode(luoghi,birthState||g.cittadinanza);
     const nationalityCode=findCode(luoghi,g.cittadinanza);
     const birthPlaceCode=findCode(luoghi,g.luogo_nascita);
-    const docCode=findDocCode(docs,g.tipo_documento||"Carta identità");
-    const releaseCode=findCode(luoghi,g.stato_documento||g.luogo_rilascio||g.cittadinanza);
+    const docCode=isComponent?"":findDocCode(docs,g.tipo_documento||"Carta identità");
+    const releaseCode=isComponent?"":findCode(luoghi,g.stato_documento||g.luogo_rilascio||g.cittadinanza);
+    const numeroDocumento=isComponent?"":g.numero_documento;
     const sesso=g.sesso==="M"?"1":g.sesso==="F"?"2":"";
-    if(!g.cognome||!g.nome||!g.nascita||!sesso||!nationalityCode||!birthStateCode||!docCode||!g.numero_documento||!releaseCode){
-      problems.push(`Ospite ${i+1}: dati/codici mancanti (controlla nascita, cittadinanza, sesso, documento e luogo rilascio).`); continue;
+    if(!g.cognome||!g.nome||!g.nascita||!sesso||!nationalityCode||!birthStateCode || (!isComponent && (!docCode||!numeroDocumento||!releaseCode))){
+      problems.push(`Ospite ${i+1}: dati/codici mancanti (controlla nascita, cittadinanza, sesso${isComponent?"":" , documento e luogo rilascio"}).`); continue;
     }
     if(birthStateCode==="100000100"&&!birthPlaceCode) problems.push(`Ospite ${i+1}: luogo di nascita "${g.luogo_nascita}" non trovato nella tabella Alloggiati.`);
-    const line = fixed(type16,2)+fixed(isoToDMY(stay.arrival),10)+fixed(String(stay.nights).padStart(2,"0"),2)+fixed(g.cognome,50)+fixed(g.nome,30)+fixed(sesso,1)+fixed(isoToDMY(g.nascita),10)+fixed(birthStateCode==="100000100"?birthPlaceCode:"",9)+fixed(birthStateCode==="100000100"?(g.provincia_nascita||""):"",2)+fixed(birthStateCode,9)+fixed(nationalityCode,9)+fixed(docCode,5)+fixed(g.numero_documento,20)+fixed(releaseCode,9);
+    const line = fixed(typeCode,2)+fixed(isoToDMY(stay.arrival),10)+fixed(String(stay.nights).padStart(2,"0"),2)+fixed(g.cognome,50)+fixed(g.nome,30)+fixed(sesso,1)+fixed(isoToDMY(g.nascita),10)+fixed(birthStateCode==="100000100"?birthPlaceCode:"",9)+fixed(birthStateCode==="100000100"?(g.provincia_nascita||""):"",2)+fixed(birthStateCode,9)+fixed(nationalityCode,9)+fixed(docCode,5)+fixed(numeroDocumento,20)+fixed(releaseCode,9);
     if(line.length!==168) problems.push(`Ospite ${i+1}: record generato di ${line.length} caratteri invece di 168.`); else records.push(line);
   }
   if(problems.length) throw new Error(problems.join(" | "));
@@ -287,7 +297,14 @@ async function rossSend(stay){
   const roomsAvailable=Number(process.env.ROSS_ROOMS_AVAILABLE||1);
   const bedsAvailable=Number(process.env.ROSS_BEDS_AVAILABLE||stay.guests.length);
   const roomOccupied=1;
-  const arrivi=stay.guests.map((g,i)=>`<arrivo><idswh>${rossXmlEscape(`${stay.id}-${i+1}`)}</idswh><tipoalloggiato>16</tipoalloggiato><idcapo></idcapo><cognome>${rossXmlEscape(g.cognome)}</cognome><nome>${rossXmlEscape(g.nome)}</nome><sesso>${g.sesso||""}</sesso><cittadinanza>${rossXmlEscape(g.cittadinanza_code||g.cittadinanza||"")}</cittadinanza><statoresidenza>${rossXmlEscape(g.residenza_stato_code||g.residenza_stato||"")}</statoresidenza><luogoresidenza>${rossXmlEscape(g.residenza_luogo||"")}</luogoresidenza><datanascita>${yyyymmdd(g.nascita)}</datanascita><statonascita>${rossXmlEscape(g.stato_nascita_code||g.stato_nascita||g.cittadinanza||"")}</statonascita><comunenascita>${rossXmlEscape(g.comune_nascita_code||"")}</comunenascita><tipoturismo>${rossXmlEscape(g.tipoturismo||tourism)}</tipoturismo><mezzotrasporto>${rossXmlEscape(g.mezzotrasporto||transport)}</mezzotrasporto><canaleprenotazione>${rossXmlEscape(g.canaleprenotazione||channel)}</canaleprenotazione><titolostudio>${rossXmlEscape(g.titolostudio||"")}</titolostudio><professione>${rossXmlEscape(g.professione||"")}</professione><esenzioneimposta>${rossXmlEscape(g.esenzioneimposta||"")}</esenzioneimposta></arrivo>`).join("");
+  const rossTypeCodes={ospite_singolo:"16",capo_famiglia:"17",capo_gruppo:"18",familiare:"19",membro_gruppo:"20"};
+  const firstId=`${stay.id}-1`;
+  const arrivi=stay.guests.map((g,i)=>{
+    const guestType=String(g.tipologia||"ospite_singolo");
+    const typeCode=rossTypeCodes[guestType]||"16";
+    const idcapo=(guestType==="familiare"||guestType==="membro_gruppo")?firstId:"";
+    return `<arrivo><idswh>${rossXmlEscape(`${stay.id}-${i+1}`)}</idswh><tipoalloggiato>${typeCode}</tipoalloggiato><idcapo>${rossXmlEscape(idcapo)}</idcapo><cognome>${rossXmlEscape(g.cognome)}</cognome><nome>${rossXmlEscape(g.nome)}</nome><sesso>${g.sesso||""}</sesso><cittadinanza>${rossXmlEscape(g.cittadinanza_code||g.cittadinanza||"")}</cittadinanza><statoresidenza>${rossXmlEscape(g.residenza_stato_code||g.residenza_stato||"")}</statoresidenza><luogoresidenza>${rossXmlEscape(g.residenza_luogo||"")}</luogoresidenza><datanascita>${yyyymmdd(g.nascita)}</datanascita><statonascita>${rossXmlEscape(g.stato_nascita_code||g.stato_nascita||g.cittadinanza||"")}</statonascita><comunenascita>${rossXmlEscape(g.comune_nascita_code||"")}</comunenascita><tipoturismo>${rossXmlEscape(g.tipoturismo||tourism)}</tipoturismo><mezzotrasporto>${rossXmlEscape(g.mezzotrasporto||transport)}</mezzotrasporto><canaleprenotazione>${rossXmlEscape(g.canaleprenotazione||channel)}</canaleprenotazione><titolostudio>${rossXmlEscape(g.titolostudio||"")}</titolostudio><professione>${rossXmlEscape(g.professione||"")}</professione><esenzioneimposta>${rossXmlEscape(g.esenzioneimposta||"")}</esenzioneimposta></arrivo>`;
+  }).join("");
   const xml=`<?xml version="1.0" encoding="UTF-8"?><S:Envelope xmlns:S="http://schemas.xmlsoap.org/soap/envelope/"><S:Body><ns2:inviaMovimentazione xmlns:ns2="http://checkin.ws.service.turismo5.gies.it/"><movimentazione><codice>${rossXmlEscape(process.env.ROSS_STRUCTURE_CODE)}</codice><prodotto>${rossXmlEscape(product)}</prodotto><movimento><data>${yyyymmdd(stay.arrival)}</data><struttura><apertura>SI</apertura><camereoccupate>${roomOccupied}</camereoccupate><cameredisponibili>${roomsAvailable}</cameredisponibili><lettidisponibili>${bedsAvailable}</lettidisponibili></struttura><arrivi>${arrivi}</arrivi></movimento></movimentazione></ns2:inviaMovimentazione></S:Body></S:Envelope>`;
   const auth=Buffer.from(`${process.env.ROSS_USER}:${process.env.ROSS_PASSWORD}`).toString("base64");
   const r=await fetch(endpoint,{method:"POST",headers:{Accept:"text/xml, multipart/related",Authorization:`Basic ${auth}`,"Content-Type":"text/xml; charset=utf-8",SOAPAction:"","User-Agent":"CheckIn-Lazio/1.0"},body:xml});
@@ -295,7 +312,7 @@ async function rossSend(stay){
   if(!r.ok) throw new Error(`ROSS HTTP ${r.status}: ${text.slice(0,800)}`);
   const fault=tag(text,"faultstring")||tag(text,"detail");
   if(fault) return {ok:false,status:"error",error:fault,raw:text.slice(0,5000)};
-  return {ok:true,status:"sent",message:"ROSS 1000 ha accettato la richiesta HTTP SOAP.",raw:text.slice(0,5000)};
+  return {ok:true,status:"sent",message:"ROSS 1000 ha accettato la richiesta HTTP SOAP. Il movimento è stato inviato con il tipo alloggiato selezionato; per ospiti singoli condividenti la stessa camera, la camera occupata è conteggiata una sola volta.",raw:text.slice(0,5000)};
 }
 
 app.get(/.*/, (req,res)=>res.sendFile(path.join(__dirname,"public","index.html")));
