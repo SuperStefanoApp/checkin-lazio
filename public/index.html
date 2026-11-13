@@ -32,7 +32,7 @@
 </div>
 <div class="small" style="margin-top:8px">La partenza è il giorno successivo all'ultima notte: 12/11 + 3 notti = 15/11. La differenza tra arrivo e partenza coincide con il numero di notti.</div>
 <div id="guests"></div>
-<div class="row" style="margin-top:10px"><button class="secondary" onclick="addManual()">+ Inserisci manualmente</button><button onclick="saveStay()">Salva check-in</button></div>
+<div class="row" style="margin-top:10px"><button type="button" class="secondary" onclick="addManual()">+ Inserisci manualmente</button><button type="button" onclick="saveStay()">Salva check-in</button></div>
 <div id="saveMsg" class="status hidden"></div>
 </div>
 
@@ -76,7 +76,15 @@ function countryName(code){const c=String(code||"").trim().toUpperCase(); return
 function api(path,opt={}){opt.headers={...(opt.headers||{}),Authorization:"Bearer "+token,"Content-Type":"application/json"};return fetch(path,opt)}
 function show(id,msg){const e=document.getElementById(id);e.textContent=msg;e.classList.remove("hidden")}
 
-async function login(){const r=await fetch("/api/login",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({username:user.value,password:pass.value})});const j=await r.json();if(j.ok){token=j.token;localStorage.setItem("checkin_token",token);document.getElementById("login").classList.add("hidden");document.getElementById("app").classList.remove("hidden");syncGuests();setDepartureFromNights()}else show("loginMsg",j.error||"Accesso negato")}
+async function login(){
+ const userEl=document.getElementById("user"), passEl=document.getElementById("pass");
+ try{
+  const r=await fetch("/api/login",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({username:userEl.value,password:passEl.value})});
+  const j=await r.json();
+  if(j.ok){token=j.token;localStorage.setItem("checkin_token",token);document.getElementById("login").classList.add("hidden");document.getElementById("app").classList.remove("hidden");syncGuests();setDepartureFromNights()}
+  else show("loginMsg",j.error||"Accesso negato")
+ }catch(e){show("loginMsg","Errore di collegamento: "+(e.message||e))}
+}
 
 // Date handling deliberately avoids toISOString(), which converts midnight to UTC and
 // can shift an Italian calendar date back by one day.
@@ -93,8 +101,8 @@ function addDays(dateStr,n){
  const yy=dt.getFullYear(), mm=String(dt.getMonth()+1).padStart(2,"0"), dd=String(dt.getDate()).padStart(2,"0");
  return `${yy}-${mm}-${dd}`;
 }
-function setDepartureFromNights(){if(!arrival.value)return;const n=Number(nights.value||0);if(n<1)return;departure.value=addDays(arrival.value,n)}
-function setNightsFromDates(){const n=dateDiff(arrival.value,departure.value);if(n!==null&&n>=1)nights.value=n}
+function setDepartureFromNights(){const arrivalEl=document.getElementById("arrival"), departureEl=document.getElementById("departure"), nightsEl=document.getElementById("nights");if(!arrivalEl.value)return;const n=Number(nightsEl.value||0);if(n<1)return;departureEl.value=addDays(arrivalEl.value,n)}
+function setNightsFromDates(){const arrivalEl=document.getElementById("arrival"), departureEl=document.getElementById("departure"), nightsEl=document.getElementById("nights");const n=dateDiff(arrivalEl.value,departureEl.value);if(n!==null&&n>=1)nightsEl.value=n}
 
 function guestHtml(i){
  const first=i===1;
@@ -117,8 +125,8 @@ ${first?`<div class="doc-field"><label>Tipologia documento</label><select data-f
 <button type="button" class="secondary" style="margin-top:12px" onclick="scanGuestMrz(${i-1})">📷 Leggi documento di Ospite ${i}</button>
 <div class="small" style="margin-top:6px">Scansione disponibile in modalità <strong>MRZ</strong> oppure <strong>OCR</strong>. La lettura è associata esclusivamente a questo ospite. Per gli ospiti successivi non vengono richiesti i dati del documento.</div>
 </div>`}
-function syncGuests(){let n=Math.max(1,Number(party.value||1));guests.innerHTML=Array.from({length:n},(_,i)=>guestHtml(i+1)).join("");applyHeadGuestRule();for(let i=0;i<n;i++)updateGuestType(i)}
-function addManual(){party.value=Number(party.value||0)+1;syncGuests();guests.lastElementChild?.scrollIntoView({behavior:"smooth"})}
+function syncGuests(){const partyEl=document.getElementById("party"), guestsEl=document.getElementById("guests");let n=Math.max(1,Number(partyEl.value||1));guestsEl.innerHTML=Array.from({length:n},(_,i)=>guestHtml(i+1)).join("");applyHeadGuestRule();for(let i=0;i<n;i++)updateGuestType(i)}
+function addManual(){const partyEl=document.getElementById("party"), guestsEl=document.getElementById("guests");partyEl.value=Number(partyEl.value||0)+1;syncGuests();guestsEl.lastElementChild?.scrollIntoView({behavior:"smooth"})}
 function applyHeadGuestRule(){
  const first=getGuest(0); if(!first)return;
  const firstType=first.querySelector('[data-f="tipologia"]')?.value;
@@ -239,7 +247,21 @@ function collectGuests(){
    return o;
  });
 }
-async function saveStay(){setNightsFromDates();if(!arrival.value||!departure.value||Number(nights.value)<1){show("saveMsg","Controlla arrivo e partenza: la partenza deve essere successiva all'arrivo.");return}const gs=collectGuests();const r=await api("/api/stays",{method:"POST",body:JSON.stringify({arrival:arrival.value,nights:Number(nights.value),departure:departure.value,guests:gs})});const j=await r.json();show("saveMsg",j.ok?`Check-in salvato. ID ${j.id}`:(j.error||"Errore")); if(j.ok){document.getElementById("sendBox").classList.remove("hidden");window.lastStayId=j.id}}
+async function saveStay(){
+ const arrivalEl=document.getElementById("arrival"), departureEl=document.getElementById("departure"), nightsEl=document.getElementById("nights");
+ try{
+  setNightsFromDates();
+  if(!arrivalEl.value||!departureEl.value||Number(nightsEl.value)<1){show("saveMsg","Controlla arrivo e partenza: la partenza deve essere successiva all'arrivo.");return}
+  const gs=collectGuests();
+  const r=await api("/api/stays",{method:"POST",body:JSON.stringify({arrival:arrivalEl.value,nights:Number(nightsEl.value),departure:departureEl.value,guests:gs})});
+  let j={};
+  try{j=await r.json()}catch(_){j={error:`Risposta non valida dal server (HTTP ${r.status})`}}
+  if(!r.ok || !j.ok){show("saveMsg",j.error||j.detail||`Errore nel salvataggio (HTTP ${r.status})`);return}
+  show("saveMsg",`Check-in salvato. ID ${j.id}`);
+  document.getElementById("sendBox").classList.remove("hidden");
+  window.lastStayId=j.id;
+ }catch(e){show("saveMsg","Errore durante il salvataggio: "+(e.message||e))}
+}
 
 function mrzDate(v){if(!/^[0-9]{6}$/.test(v))return "";const yy=Number(v.slice(0,2)),mm=v.slice(2,4),dd=v.slice(4,6);const year=yy>=50?1900+yy:2000+yy;return `${year}-${mm}-${dd}`}
 
