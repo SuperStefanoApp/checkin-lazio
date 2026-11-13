@@ -104,7 +104,7 @@ function guestHtml(i){
 ${first
  ? `<div><label>Tipologia Alloggiato</label><select data-f="tipologia" onchange="updateGuestType(0)"><option value="ospite_singolo">Ospite singolo</option><option value="capo_famiglia">Capo famiglia</option><option value="capo_gruppo">Capo gruppo</option><option value="familiare">Familiare</option><option value="membro_gruppo">Membro gruppo</option></select></div>`
  : `<div><label>Tipologia Alloggiato</label><input data-f="tipologia" readonly value="ospite_singolo"></div>`}
-<div><label>Cittadinanza</label><input data-f="cittadinanza" oninput="syncPlacesFromNationality(${i-1})"></div>
+<div><label>Cittadinanza</label><input data-f="cittadinanza" oninput="syncPlacesFromNationality(${i-1})" onchange="syncPlacesFromNationality(${i-1})" onblur="syncPlacesFromNationality(${i-1})"></div>
 <div><label>Luogo di nascita</label><div class="field-wrap"><input data-f="luogo_nascita" autocomplete="off" oninput="handlePlaceInput(${i-1},'birth')" onblur="handlePlaceBlur(${i-1},'birth')"><div id="birthSuggestions_${i-1}" class="municipality-suggestions hidden"></div></div><div id="birthHint_${i-1}" class="municipality-hint"></div></div>
 <div><label>Cognome</label><input data-f="cognome"></div>
 <div><label>Nome</label><input data-f="nome"></div>
@@ -112,7 +112,7 @@ ${first
 <div><label>Sesso</label><select data-f="sesso"><option value="">Seleziona</option><option value="M">M</option><option value="F">F</option></select></div>
 ${first?`<div class="doc-field"><label>Tipologia documento</label><select data-f="tipo_documento"><option value="">Seleziona</option><option value="Carta d'identità">Carta d'identità</option><option value="Passaporto">Passaporto</option><option value="Patente">Patente</option><option value="Altro">Altro</option></select></div>
 <div class="doc-field"><label>Luogo di rilascio del documento</label><div class="field-wrap"><input data-f="luogo_rilascio_documento" autocomplete="off" oninput="handlePlaceInput(0,'issue')" onblur="handlePlaceBlur(0,'issue')"><div id="issueSuggestions_0" class="municipality-suggestions hidden"></div></div><div id="issueHint_0" class="municipality-hint"></div></div>
-<div class="doc-field"><label>Numero documento</label><input data-f="numero_documento"></div>`:''}
+<div class="doc-field"><label>Numero documento</label><input data-f="numero_documento"></div>`:`<input type="hidden" data-f="tipo_documento"><input type="hidden" data-f="luogo_rilascio_documento"><input type="hidden" data-f="numero_documento">`}
 </div>
 <button type="button" class="secondary" style="margin-top:12px" onclick="scanGuestMrz(${i-1})">📷 Leggi documento di Ospite ${i}</button>
 <div class="small" style="margin-top:6px">Scansione disponibile in modalità <strong>MRZ</strong> oppure <strong>OCR</strong>. La lettura è associata esclusivamente a questo ospite. Per gli ospiti successivi non vengono richiesti i dati del documento.</div>
@@ -233,9 +233,9 @@ function collectGuests(){
    if(o.cittadinanza && isItalianNationality(o.cittadinanza)){
      o.provincia_nascita=String(g.dataset.birthProvince||g.querySelector('[data-f="luogo_nascita"]')?.dataset.municipalityProvince||"").toUpperCase();
    }
-   if(o.tipologia==="familiare"||o.tipologia==="membro_gruppo"){
-     delete o.tipo_documento; delete o.luogo_rilascio_documento; delete o.numero_documento;
-   }
+   // I campi documento degli ospiti successivi sono nascosti nell'interfaccia,
+   // ma restano necessari per Alloggiati Web quando il documento è stato letto.
+   // Non eliminarli dalla struttura dati: sono valorizzati dai dati MRZ/OCR.
    return o;
  });
 }
@@ -271,6 +271,13 @@ function applyMrzResult(result){
    numero_documento:get("Passport Number","Document Number")
  };
  for(const [k,v] of Object.entries(data)){const el=g.querySelector(`[data-f="${k}"]`);if(el&&v)el.value=v}
+ // Dopo aver letto la cittadinanza dalla MRZ, applica immediatamente la regola
+ // del luogo di nascita/rilascio: per stranieri = Paese; per italiani = Comune.
+ if(nationality){
+   const citEl=g.querySelector('[data-f="cittadinanza"]');
+   if(citEl)citEl.value=nationality;
+   syncPlacesFromNationality(activeGuestIndex);
+ }
  const validation=p.Validation;
  return validation?.isValid===true;
 }
@@ -374,7 +381,7 @@ function parseCieOcr(text){
  const given=/(?:NOME|GIVEN NAMES?)\s*[:\-]?\s*([^\n]+)/i.exec(t); if(given)set("nome",given[1]);
  const dob=/(?:DATA DI NASCITA|DATE OF BIRTH)\s*[:\-]?\s*(\d{1,2}[\/\.-]\d{1,2}[\/\.-]\d{4})/i.exec(t);
  if(dob){const m=dob[1].match(/(\d{1,2})[\/\.-](\d{1,2})[\/\.-](\d{4})/);if(m)set("nascita",`${m[3]}-${String(m[2]).padStart(2,"0")}-${String(m[1]).padStart(2,"0")}`)}
- const cit=/CITTADINANZA\s*[:\-]?\s*([^\n]+)/i.exec(t);if(cit)set("cittadinanza",cit[1]);
+ const cit=/CITTADINANZA\s*[:\-]?\s*([^\n]+)/i.exec(t);if(cit){set("cittadinanza",cit[1]);syncPlacesFromNationality(activeGuestIndex)}
  const gend=/(?:SESSO|SEX)\s*[:\-]?\s*([MF])/i.exec(upper);if(gend)set("sesso",gend[1]);
  show("cieOcrMsg","✓ Analisi completata. Controlla i campi compilati automaticamente: l'OCR può richiedere una correzione manuale.");
  if(cieStream){cieStream.getTracks().forEach(t=>t.stop());cieStream=null}

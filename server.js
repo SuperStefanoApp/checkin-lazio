@@ -164,7 +164,18 @@ async function buildAlloggiatiRecords(stay){
   const records=[];
   const problems=[];
   for(let i=0;i<stay.guests.length;i++){
-    const g=stay.guests[i]||{};
+    const g={...(stay.guests[i]||{})};
+    // Per i cittadini stranieri Alloggiati richiede il Paese sia come stato
+    // di nascita sia come luogo/stato di rilascio. Se l'interfaccia ha
+    // compilato il campo automaticamente ma il browser non lo ha trasmesso,
+    // lo ricaviamo comunque dalla cittadinanza prima della validazione.
+    const foreign=!isItalianCountry(g.cittadinanza);
+    if(foreign){
+      if(!String(g.luogo_nascita||'').trim()) g.luogo_nascita=countryToFull(g.cittadinanza);
+      if(!String(g.luogo_rilascio_documento||'').trim()) g.luogo_rilascio_documento=countryToFull(g.cittadinanza);
+      if(!String(g.stato_nascita||'').trim()) g.stato_nascita=countryToFull(g.cittadinanza);
+      if(!String(g.stato_documento||'').trim()) g.stato_documento=countryToFull(g.cittadinanza);
+    }
     const birthState=countryToFull(g.stato_nascita||g.stato_documento||g.cittadinanza);
     const birthStateCode=findCode(luoghi,birthState||g.cittadinanza);
     const nationalityCode=findCode(luoghi,g.cittadinanza);
@@ -181,6 +192,10 @@ async function buildAlloggiatiRecords(stay){
   }
   if(problems.length) throw new Error(problems.join(" | "));
   return {token,records};
+}
+function isItalianCountry(v){
+  const n=norm(v);
+  return n==="ITALIA"||n==="ITALY"||n==="ITA";
 }
 function countryToFull(v){
   const m={ITA:"Italia",Italy:"Italia",Italia:"Italia",FRA:"Francia",France:"Francia",DEU:"Germania",Germany:"Germania",ESP:"Spagna",Spain:"Spagna",GBR:"Regno Unito",UK:"Regno Unito",USA:"Stati Uniti",US:"Stati Uniti",CHE:"Svizzera",Switzerland:"Svizzera",AUT:"Austria",NLD:"Paesi Bassi",BEL:"Belgio",PRT:"Portogallo",POL:"Polonia",ROU:"Romania",BRA:"Brasile",CAN:"Canada",ARG:"Argentina",CHN:"Cina",JPN:"Giappone",IND:"India",ALB:"Albania",HRV:"Croazia",SVN:"Slovenia",SVK:"Slovacchia",CZE:"Cechia",HUN:"Ungheria",BGR:"Bulgaria",SRB:"Serbia",UKR:"Ucraina",RUS:"Russia",MAR:"Marocco",TUR:"Turchia",EGY:"Egitto"};
