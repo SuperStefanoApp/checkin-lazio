@@ -48,6 +48,29 @@ function auth(req,res,next){
 app.use("/api", auth);
 
 app.get("/api/health",(req,res)=>res.json({ok:true,service:"checkin-lazio",time:new Date().toISOString()}));
+
+// Ricerca comuni italiani: proxy server-side verso un dataset aggiornato derivato da ISTAT.
+// Il frontend non contatta direttamente servizi esterni e riceve solo i campi necessari.
+const comuniCache = new Map();
+app.get("/api/comuni",async(req,res)=>{
+  const q=String(req.query.q||"").trim();
+  if(q.length<2) return res.json({ok:true,items:[]});
+  const key=q.toLocaleLowerCase("it-IT");
+  const cached=comuniCache.get(key);
+  if(cached && (Date.now()-cached.time)<10*60*1000) return res.json({ok:true,items:cached.items});
+  try{
+    const url=`https://comuni-ita.nicolorebaioli.dev/v5/comuni?q=${encodeURIComponent(q)}&sort=nome&fields=nome,codice,sigla&pagesize=12`;
+    const r=await fetch(url,{headers:{Accept:"application/json","User-Agent":"CheckIn-Lazio/1.0"}});
+    if(!r.ok) throw new Error(`HTTP ${r.status}`);
+    const data=await r.json();
+    const raw=Array.isArray(data)?data:(Array.isArray(data?.data)?data.data:(Array.isArray(data?.items)?data.items:[]));
+    const items=raw.map(x=>({nome:String(x.nome||x.name||"").trim(),sigla:String(x.sigla||x.provincia?.sigla||"").trim().toUpperCase(),codice:String(x.codice||x.istat||"").trim()})).filter(x=>x.nome);
+    comuniCache.set(key,{time:Date.now(),items});
+    return res.json({ok:true,items});
+  }catch(e){
+    return res.status(502).json({ok:false,error:"RICERCA_COMUNI_NON_DISPONIBILE",detail:String(e.message||e)});
+  }
+});
 app.post("/api/login",(req,res)=>{
   const {username,password}=req.body||{};
   if(username===process.env.ADMIN_USER && password===process.env.ADMIN_PASSWORD){

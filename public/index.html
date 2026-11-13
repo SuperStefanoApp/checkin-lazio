@@ -8,7 +8,7 @@
 <title>CheckIn Lazio</title>
 <style>
 :root{font-family:system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;color:#163047;background:#f4f7fa}
-*{box-sizing:border-box}body{margin:0}.top{background:#123b5d;color:#fff;padding:18px 20px;position:sticky;top:0;z-index:5}.top h1{margin:0;font-size:22px}.wrap{max-width:900px;margin:0 auto;padding:18px}.card{background:#fff;border-radius:16px;padding:18px;margin-bottom:16px;box-shadow:0 2px 12px #00000012}.grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px}@media(max-width:650px){.grid{grid-template-columns:1fr}}label{font-weight:600;font-size:13px;display:block;margin-bottom:6px}input,button,select{width:100%;padding:12px;border:1px solid #ccd6df;border-radius:10px;font-size:16px}input[readonly]{background:#f2f5f7}button{background:#123b5d;color:#fff;border:0;font-weight:700;cursor:pointer}.secondary{background:#e9eef3;color:#123b5d}.danger{background:#a62929}.guest{border:1px solid #dce4eb;border-radius:12px;padding:14px;margin:12px 0}.row{display:flex;gap:10px;align-items:center}.row>*{flex:1}.status{padding:10px;border-radius:10px;background:#eef5fa;margin-top:12px}.small{font-size:12px;color:#617487}.hidden{display:none}.pill{display:inline-block;padding:5px 9px;border-radius:999px;background:#e9eef3;font-size:12px}
+*{box-sizing:border-box}body{margin:0}.top{background:#123b5d;color:#fff;padding:18px 20px;position:sticky;top:0;z-index:5}.top h1{margin:0;font-size:22px}.wrap{max-width:900px;margin:0 auto;padding:18px}.card{background:#fff;border-radius:16px;padding:18px;margin-bottom:16px;box-shadow:0 2px 12px #00000012}.grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px}@media(max-width:650px){.grid{grid-template-columns:1fr}}label{font-weight:600;font-size:13px;display:block;margin-bottom:6px}input,button,select{width:100%;padding:12px;border:1px solid #ccd6df;border-radius:10px;font-size:16px}input[readonly]{background:#f2f5f7}button{background:#123b5d;color:#fff;border:0;font-weight:700;cursor:pointer}.secondary{background:#e9eef3;color:#123b5d}.danger{background:#a62929}.guest{border:1px solid #dce4eb;border-radius:12px;padding:14px;margin:12px 0}.row{display:flex;gap:10px;align-items:center}.row>*{flex:1}.status{padding:10px;border-radius:10px;background:#eef5fa;margin-top:12px}.small{font-size:12px;color:#617487}.hidden{display:none}.pill{display:inline-block;padding:5px 9px;border-radius:999px;background:#e9eef3;font-size:12px}.field-wrap{position:relative}.municipality-suggestions{position:absolute;left:0;right:0;top:100%;z-index:20;background:#fff;border:1px solid #ccd6df;border-radius:10px;box-shadow:0 8px 24px #00000018;overflow:hidden}.municipality-suggestions button{display:block;width:100%;text-align:left;background:#fff;color:#163047;border:0;border-radius:0;padding:10px 12px;font-weight:500}.municipality-suggestions button:hover{background:#eef5fa}.municipality-hint{font-size:11px;color:#617487;margin-top:4px}
 #mrzPanel{position:fixed;inset:0;background:#f4f7fa;z-index:1000;display:flex;flex-direction:column;overflow:auto}#mrzPanel.hidden{display:none}.scan-top{background:#123b5d;color:#fff;padding:16px 18px;display:flex;align-items:center;gap:12px;position:sticky;top:0;z-index:2}.scan-top h2{margin:0;font-size:19px;flex:1}.scan-close{width:auto;padding:10px 14px;background:#fff;color:#123b5d}.scan-body{width:100%;max-width:900px;margin:0 auto;padding:16px}.scan-status{margin:0 0 12px}.scan-actions{display:flex;gap:10px;margin-top:12px}.scan-actions button{flex:1}.scan-note{background:#eef5fa;padding:12px;border-radius:10px;margin-top:10px;font-size:13px;color:#40566a}.scan-note strong{color:#123b5d}#mrz-reader{width:100%;max-width:888px;margin:0 auto;border-radius:14px;overflow:hidden;background:#0b1116;min-height:300px}.result-box{margin-top:12px;padding:12px;border-radius:10px;background:#eef8ef;border:1px solid #cde7d0}.warning-box{margin-top:12px;padding:12px;border-radius:10px;background:#fff6e8;border:1px solid #f0d7a8}
 </style>
 </head>
@@ -105,13 +105,13 @@ ${first
  ? `<div><label>Tipologia Alloggiato</label><select data-f="tipologia" onchange="updateGuestType(0)"><option value="ospite_singolo">Ospite singolo</option><option value="capo_famiglia">Capo famiglia</option><option value="capo_gruppo">Capo gruppo</option><option value="familiare">Familiare</option><option value="membro_gruppo">Membro gruppo</option></select></div>`
  : `<div><label>Tipologia Alloggiato</label><input data-f="tipologia" readonly value="ospite_singolo"></div>`}
 <div><label>Cittadinanza</label><input data-f="cittadinanza" oninput="syncPlacesFromNationality(${i-1})"></div>
-<div><label>Luogo di nascita</label><input data-f="luogo_nascita" oninput="markBirthplaceManual(${i-1})"></div>
+<div><label>Luogo di nascita</label><div class="field-wrap"><input data-f="luogo_nascita" autocomplete="off" oninput="handlePlaceInput(${i-1},'birth')" onblur="handlePlaceBlur(${i-1},'birth')"><div id="birthSuggestions_${i-1}" class="municipality-suggestions hidden"></div></div><div id="birthHint_${i-1}" class="municipality-hint"></div></div>
 <div><label>Cognome</label><input data-f="cognome"></div>
 <div><label>Nome</label><input data-f="nome"></div>
 <div><label>Data di nascita</label><input data-f="nascita" type="date"></div>
 <div><label>Sesso</label><select data-f="sesso"><option value="">Seleziona</option><option value="M">M</option><option value="F">F</option></select></div>
 ${first?`<div class="doc-field"><label>Tipologia documento</label><select data-f="tipo_documento"><option value="">Seleziona</option><option value="Carta d'identità">Carta d'identità</option><option value="Passaporto">Passaporto</option><option value="Patente">Patente</option><option value="Altro">Altro</option></select></div>
-<div class="doc-field"><label>Luogo di rilascio del documento</label><input data-f="luogo_rilascio_documento" oninput="markIssuingPlaceManual(0)"></div>
+<div class="doc-field"><label>Luogo di rilascio del documento</label><div class="field-wrap"><input data-f="luogo_rilascio_documento" autocomplete="off" oninput="handlePlaceInput(0,'issue')" onblur="handlePlaceBlur(0,'issue')"><div id="issueSuggestions_0" class="municipality-suggestions hidden"></div></div><div id="issueHint_0" class="municipality-hint"></div></div>
 <div class="doc-field"><label>Numero documento</label><input data-f="numero_documento"></div>`:''}
 </div>
 <button type="button" class="secondary" style="margin-top:12px" onclick="scanGuestMrz(${i-1})">📷 Leggi documento di Ospite ${i}</button>
@@ -133,28 +133,106 @@ function updateGuestType(index){
  const g=getGuest(index); if(!g)return;
  if(index===0) applyHeadGuestRule();
 }
+function isItalianNationality(value){
+ const v=String(value||"").trim().normalize("NFD").replace(/[\u0300-\u036f]/g,"").toUpperCase();
+ return v==="ITALIA"||v==="ITALIAN"||v==="ITA";
+}
+function placeField(index,kind){
+ const g=getGuest(index);if(!g)return null;
+ return kind==="birth"?g.querySelector('[data-f="luogo_nascita"]'):g.querySelector('[data-f="luogo_rilascio_documento"]');
+}
+function placeSuggestionBox(index,kind){return document.getElementById(`${kind==='birth'?'birth':'issue'}Suggestions_${index}`)}
+function placeHint(index,kind){return document.getElementById(`${kind==='birth'?'birth':'issue'}Hint_${index}`)}
+function clearPlaceSuggestions(index,kind){const box=placeSuggestionBox(index,kind);if(box){box.innerHTML="";box.classList.add("hidden")}}
 function markBirthplaceManual(index){
  const g=getGuest(index); if(!g)return;
  const b=g.querySelector('[data-f="luogo_nascita"]');
  if(b && b.value.trim()!==String(g.dataset.birthplaceAutoValue||"").trim()) g.dataset.birthplaceManual="1";
-}
-function syncPlacesFromNationality(index){
- const g=getGuest(index);if(!g)return;
- const c=g.querySelector('[data-f="cittadinanza"]')?.value?.trim();
- if(!c)return;
- const b=g.querySelector('[data-f="luogo_nascita"]');
- const i=g.querySelector('[data-f="luogo_rilascio_documento"]');
- if(b&&g.dataset.birthplaceManual!=="1"){b.value=c;g.dataset.birthplaceAutoValue=c;}
- if(i&&g.dataset.issuingPlaceManual!=="1"){i.value=c;g.dataset.issuingPlaceAutoValue=c;}
 }
 function markIssuingPlaceManual(index){
  const g=getGuest(index);if(!g)return;
  const el=g.querySelector('[data-f="luogo_rilascio_documento"]');
  if(el && el.value.trim()!==String(g.dataset.issuingPlaceAutoValue||"").trim()) g.dataset.issuingPlaceManual="1";
 }
+function syncPlacesFromNationality(index){
+ const g=getGuest(index);if(!g)return;
+ const c=g.querySelector('[data-f="cittadinanza"]')?.value?.trim();
+ const b=g.querySelector('[data-f="luogo_nascita"]');
+ const i=g.querySelector('[data-f="luogo_rilascio_documento"]');
+ if(!c){clearPlaceSuggestions(index,'birth');clearPlaceSuggestions(index,'issue');return;}
+ if(isItalianNationality(c)){
+   if(b&&g.dataset.birthplaceManual!=="1"){b.value="";g.dataset.birthplaceAutoValue="";}
+   if(i&&g.dataset.issuingPlaceManual!=="1"){i.value="";g.dataset.issuingPlaceAutoValue="";}
+   if(placeHint(index,'birth'))placeHint(index,'birth').textContent="Cerca e seleziona il Comune italiano.";
+   if(placeHint(index,'issue'))placeHint(index,'issue').textContent="Cerca e seleziona il Comune italiano.";
+ }else{
+   if(b&&g.dataset.birthplaceManual!=="1"){b.value=c;g.dataset.birthplaceAutoValue=c;}
+   if(i&&g.dataset.issuingPlaceManual!=="1"){i.value=c;g.dataset.issuingPlaceAutoValue=c;}
+   if(placeHint(index,'birth'))placeHint(index,'birth').textContent="Per cittadini stranieri viene indicato il Paese.";
+   if(placeHint(index,'issue'))placeHint(index,'issue').textContent="Per cittadini stranieri viene indicato il Paese.";
+   clearPlaceSuggestions(index,'birth');clearPlaceSuggestions(index,'issue');
+ }
+}
+let placeSearchTimers={};
+async function searchMunicipalities(index,kind){
+ const g=getGuest(index);if(!g)return;
+ const c=g.querySelector('[data-f="cittadinanza"]')?.value?.trim();
+ const field=placeField(index,kind); if(!field||!isItalianNationality(c))return;
+ const q=field.value.trim(); if(q.length<2){clearPlaceSuggestions(index,kind);return;}
+ const key=`${index}:${kind}`;clearTimeout(placeSearchTimers[key]);
+ placeSearchTimers[key]=setTimeout(async()=>{
+   try{
+     const r=await api(`/api/comuni?q=${encodeURIComponent(q)}`);
+     const j=await r.json();
+     if(!j.ok)throw new Error(j.error||"Ricerca non disponibile");
+     const box=placeSuggestionBox(index,kind);if(!box)return;
+     box.innerHTML=j.items.map(x=>`<button type="button" data-name="${escapeHtml(x.nome)}" data-prov="${escapeHtml(x.sigla)}" data-code="${escapeHtml(x.codice)}" onclick="selectMunicipality(${index},'${kind}',this)">${escapeHtml(x.nome)}${x.sigla?` (${escapeHtml(x.sigla)})`:''}</button>`).join("");
+     box.classList.toggle("hidden",j.items.length===0);
+   }catch(e){clearPlaceSuggestions(index,kind);}
+ },180);
+}
+function escapeHtml(v){return String(v??"").replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/\"/g,"&quot;").replace(/'/g,"&#39;")}
+function handlePlaceInput(index,kind){
+ const g=getGuest(index);if(!g)return;
+ const c=g.querySelector('[data-f="cittadinanza"]')?.value?.trim();
+ if(!isItalianNationality(c)){
+   if(kind==='birth')markBirthplaceManual(index);else markIssuingPlaceManual(index);
+   clearPlaceSuggestions(index,kind);return;
+ }
+ const field=placeField(index,kind);if(field){field.dataset.municipalitySelected="0";field.dataset.municipalityCode="";field.dataset.municipalityProvince="";}
+ if(kind==='birth')markBirthplaceManual(index);else markIssuingPlaceManual(index);
+ searchMunicipalities(index,kind);
+}
+function selectMunicipality(index,kind,button){
+ const g=getGuest(index);if(!g)return;
+ const field=placeField(index,kind);if(!field)return;
+ const name=button.dataset.name||"";
+ field.value=name;field.dataset.municipalitySelected="1";field.dataset.municipalityCode=button.dataset.code||"";field.dataset.municipalityProvince=button.dataset.prov||"";
+ if(kind==='birth'){g.dataset.birthplaceManual="1";g.dataset.birthplaceAutoValue="";g.dataset.birthProvince=button.dataset.prov||"";}
+ else{g.dataset.issuingPlaceManual="1";g.dataset.issuingPlaceAutoValue="";}
+ clearPlaceSuggestions(index,kind);
+ const h=placeHint(index,kind);if(h)h.textContent=`Selezionato: ${name}${button.dataset.prov?` (${button.dataset.prov})`:''}`;
+}
+function handlePlaceBlur(index,kind){
+ setTimeout(()=>{
+   clearPlaceSuggestions(index,kind);
+   const g=getGuest(index);if(!g)return;
+   const c=g.querySelector('[data-f="cittadinanza"]')?.value?.trim();
+   if(!isItalianNationality(c))return;
+   const field=placeField(index,kind);if(!field)return;
+   if(field.value.trim() && field.dataset.municipalitySelected!=="1"){
+     field.value="";
+     if(kind==='birth')g.dataset.birthProvince="";
+     const h=placeHint(index,kind);if(h)h.textContent="Seleziona un Comune dall'elenco per evitare errori.";
+   }
+ },150);
+}
 function collectGuests(){
  return [...document.querySelectorAll(".guest")].map(g=>{
    const o=Object.fromEntries([...g.querySelectorAll("[data-f]")].map(x=>[x.dataset.f,x.value]));
+   if(o.cittadinanza && isItalianNationality(o.cittadinanza)){
+     o.provincia_nascita=String(g.dataset.birthProvince||g.querySelector('[data-f="luogo_nascita"]')?.dataset.municipalityProvince||"").toUpperCase();
+   }
    if(o.tipologia==="familiare"||o.tipologia==="membro_gruppo"){
      delete o.tipo_documento; delete o.luogo_rilascio_documento; delete o.numero_documento;
    }
