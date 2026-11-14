@@ -30,3 +30,5 @@ services:
         sync: false
       - key: ROSS_ENDPOINT
         value: https://lazioturismo.ross1000.it/ws/checkinV2
+
+# Per utenze Alloggiati di categoria "Gestione Appartamenti" impostare l'ID appartamento

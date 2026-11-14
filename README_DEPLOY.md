@@ -16,3 +16,7 @@
 3. Commit changes.
 4. Attendi il redeploy automatico di Render.
 5. Apri il link Render e verifica prima il login, poi un nuovo check-in.
+
+
+## Alloggiati Web - Gestione Appartamenti
+Se l'utenza Alloggiati è di categoria Gestione Appartamenti, impostare su Render la variabile `ALLOGGIATI_ID_APPARTAMENTO` con l'ID numerico dell'appartamento attivo visibile in Alloggiati Web > Appartamenti > Elenco.
