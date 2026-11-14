@@ -49,40 +49,23 @@ app.use("/api", auth);
 
 app.get("/api/health",(req,res)=>res.json({ok:true,service:"checkin-lazio",time:new Date().toISOString()}));
 
-// Elenco Stati/Nazioni ufficiale Alloggiati Web.
-// Viene ricavato dalla tabella "Luoghi" del Web Service della Polizia di Stato,
-// così l'app non incorpora una lista statica che potrebbe diventare obsoleta.
-let nazioniCache={time:0,items:[]};
+// Ricerca comuni italiani: proxy server-side verso un dataset aggiornato derivato da ISTAT.
+// Il frontend non contatta direttamente servizi esterni e riceve solo i campi necessari.
+const comuniCache = new Map();
+const nazioniCache = {time:0,items:[]};
 app.get("/api/nazioni",async(req,res)=>{
-  if(nazioniCache.items.length && Date.now()-nazioniCache.time<6*60*60*1000) return res.json({ok:true,items:nazioniCache.items});
+  if(nazioniCache.items.length && (Date.now()-nazioniCache.time)<6*60*60*1000) return res.json({ok:true,items:nazioniCache.items,source:"alloggiati-web"});
   try{
     const token=await alloggiatiGenerateToken();
-    const csv=await alloggiatiTable(token,"Luoghi");
-    const items=[];
-    const seen=new Set();
-    for(const row of csvRows(csv).slice(1)){
-      const cells=row.map(x=>String(x||"").trim());
-      const code=cells.find(x=>/^(100000|100001|110000)\d{3}$/.test(x))||"";
-      if(!code) continue;
-      const name=cells.find(x=>x && x!==code && !/^[-0-9]+$/.test(x))||"";
-      if(!name) continue;
-      const key=code+"|"+norm(name);
-      if(seen.has(key)) continue;
-      seen.add(key);
-      items.push({code,name});
-    }
-    items.sort((a,b)=>norm(a.name).localeCompare(norm(b.name),"it"));
-    if(!items.length) throw new Error("Tabella Stati/Nazioni vuota o non riconosciuta");
-    nazioniCache={time:Date.now(),items};
-    return res.json({ok:true,items});
+    const csv=await alloggiatiTable(token,"Nazioni");
+    const items=csvRows(csv).slice(1).map(row=>({codice:String(row[0]||"").trim(),nome:String(row[1]||"").trim()})).filter(x=>x.codice&&x.nome);
+    if(!items.length) throw new Error("Tabella Nazioni vuota");
+    nazioniCache.time=Date.now();nazioniCache.items=items;
+    return res.json({ok:true,items,source:"alloggiati-web"});
   }catch(e){
     return res.status(502).json({ok:false,error:"TABELLA_NAZIONI_NON_DISPONIBILE",detail:String(e.message||e)});
   }
 });
-
-// Ricerca comuni italiani: proxy server-side verso un dataset aggiornato derivato da ISTAT.
-// Il frontend non contatta direttamente servizi esterni e riceve solo i campi necessari.
-const comuniCache = new Map();
 app.get("/api/comuni",async(req,res)=>{
   const q=String(req.query.q||"").trim();
   if(q.length<2) return res.json({ok:true,items:[]});
@@ -217,11 +200,11 @@ async function buildAlloggiatiRecords(stay){
       if(!String(g.stato_documento||'').trim()) g.stato_documento=countryToFull(g.cittadinanza);
     }
     const birthState=countryToFull(g.stato_nascita||g.stato_documento||g.cittadinanza);
-    const birthStateCode=String(g.stato_nascita_code||g.cittadinanza_code||"").trim()||findCode(luoghi,birthState||g.cittadinanza);
-    const nationalityCode=String(g.cittadinanza_code||"").trim()||findCode(luoghi,g.cittadinanza);
+    const birthStateCode=findCode(luoghi,birthState||g.cittadinanza);
+    const nationalityCode=findCode(luoghi,g.cittadinanza);
     const birthPlaceCode=findCode(luoghi,g.luogo_nascita);
     const docCode=isComponent?"":findDocCode(docs,g.tipo_documento||"Carta identità");
-    const releaseCode=isComponent?"":String(g.stato_documento_code||g.cittadinanza_code||"").trim()||findCode(luoghi,g.stato_documento||g.luogo_rilascio||g.cittadinanza);
+    const releaseCode=isComponent?"":findCode(luoghi,g.stato_documento||g.luogo_rilascio||g.cittadinanza);
     const numeroDocumento=isComponent?"":g.numero_documento;
     const sesso=g.sesso==="M"?"1":g.sesso==="F"?"2":"";
     if(!g.cognome||!g.nome||!g.nascita||!sesso||!nationalityCode||!birthStateCode || (!isComponent && (!docCode||!numeroDocumento||!releaseCode))){

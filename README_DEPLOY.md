@@ -20,3 +20,6 @@
 
 ## Alloggiati Web - Gestione Appartamenti
 Se l'utenza Alloggiati è di categoria Gestione Appartamenti, impostare su Render la variabile `ALLOGGIATI_ID_APPARTAMENTO` con l'ID numerico dell'appartamento attivo visibile in Alloggiati Web > Appartamenti > Elenco.
+
+## V23 — Cittadinanza da tabella ufficiale Alloggiati Web
+La cittadinanza è ora un selettore interno all'app, con ricerca e elenco, non un campo di testo libero. Dopo l'accesso l'app carica la tabella `Nazioni` tramite il Web Service ufficiale Alloggiati Web usando le credenziali server già configurate. Ogni selezione conserva nome dello Stato e codice Alloggiati associato (`cittadinanza_code`). Il campo non accetta valori liberi non presenti nell'elenco. L'elenco viene memorizzato in cache sul server per 6 ore.

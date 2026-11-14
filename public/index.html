@@ -8,7 +8,7 @@
 <title>CheckIn Lazio</title>
 <style>
 :root{font-family:system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;color:#163047;background:#f4f7fa}
-*{box-sizing:border-box}body{margin:0}.top{background:#123b5d;color:#fff;padding:18px 20px;position:sticky;top:0;z-index:5}.top h1{margin:0;font-size:22px}.wrap{max-width:900px;margin:0 auto;padding:18px}.card{background:#fff;border-radius:16px;padding:18px;margin-bottom:16px;box-shadow:0 2px 12px #00000012}.grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px}@media(max-width:650px){.grid{grid-template-columns:1fr}}label{font-weight:600;font-size:13px;display:block;margin-bottom:6px}input,button,select{width:100%;padding:12px;border:1px solid #ccd6df;border-radius:10px;font-size:16px}input[readonly]{background:#f2f5f7}button{background:#123b5d;color:#fff;border:0;font-weight:700;cursor:pointer}.secondary{background:#e9eef3;color:#123b5d}.danger{background:#a62929}.guest{border:1px solid #dce4eb;border-radius:12px;padding:14px;margin:12px 0}.row{display:flex;gap:10px;align-items:center}.row>*{flex:1}.status{padding:10px;border-radius:10px;background:#eef5fa;margin-top:12px}.small{font-size:12px;color:#617487}.hidden{display:none}.pill{display:inline-block;padding:5px 9px;border-radius:999px;background:#e9eef3;font-size:12px}.field-wrap{position:relative}.municipality-suggestions{position:absolute;left:0;right:0;top:100%;z-index:20;background:#fff;border:1px solid #ccd6df;border-radius:10px;box-shadow:0 8px 24px #00000018;overflow:hidden}.municipality-suggestions button{display:block;width:100%;text-align:left;background:#fff;color:#163047;border:0;border-radius:0;padding:10px 12px;font-weight:500}.municipality-suggestions button:hover{background:#eef5fa}.municipality-hint{font-size:11px;color:#617487;margin-top:4px}
+*{box-sizing:border-box}body{margin:0}.top{background:#123b5d;color:#fff;padding:18px 20px;position:sticky;top:0;z-index:5}.top h1{margin:0;font-size:22px}.wrap{max-width:900px;margin:0 auto;padding:18px}.card{background:#fff;border-radius:16px;padding:18px;margin-bottom:16px;box-shadow:0 2px 12px #00000012}.grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px}@media(max-width:650px){.grid{grid-template-columns:1fr}}label{font-weight:600;font-size:13px;display:block;margin-bottom:6px}input,button,select{width:100%;padding:12px;border:1px solid #ccd6df;border-radius:10px;font-size:16px}input[readonly]{background:#f2f5f7}button{background:#123b5d;color:#fff;border:0;font-weight:700;cursor:pointer}.secondary{background:#e9eef3;color:#123b5d}.danger{background:#a62929}.guest{border:1px solid #dce4eb;border-radius:12px;padding:14px;margin:12px 0}.row{display:flex;gap:10px;align-items:center}.row>*{flex:1}.status{padding:10px;border-radius:10px;background:#eef5fa;margin-top:12px}.small{font-size:12px;color:#617487}.hidden{display:none}.pill{display:inline-block;padding:5px 9px;border-radius:999px;background:#e9eef3;font-size:12px}.field-wrap{position:relative}.municipality-suggestions{position:absolute;left:0;right:0;top:100%;z-index:20;background:#fff;border:1px solid #ccd6df;border-radius:10px;box-shadow:0 8px 24px #00000018;overflow:hidden}.municipality-suggestions button{display:block;width:100%;text-align:left;background:#fff;color:#163047;border:0;border-radius:0;padding:10px 12px;font-weight:500}.municipality-suggestions button:hover{background:#eef5fa}.municipality-hint{font-size:11px;color:#617487;margin-top:4px}.country-suggestions{position:absolute;left:0;right:0;top:100%;z-index:30;background:#fff;border:1px solid #ccd6df;border-radius:10px;box-shadow:0 8px 24px #00000018;overflow:auto;max-height:280px}.country-suggestions button{display:block;width:100%;text-align:left;background:#fff;color:#163047;border:0;border-radius:0;padding:10px 12px;font-weight:500}.country-suggestions button:hover{background:#eef5fa}
 #mrzPanel{position:fixed;inset:0;background:#f4f7fa;z-index:1000;display:flex;flex-direction:column;overflow:auto}#mrzPanel.hidden{display:none}.scan-top{background:#123b5d;color:#fff;padding:16px 18px;display:flex;align-items:center;gap:12px;position:sticky;top:0;z-index:2}.scan-top h2{margin:0;font-size:19px;flex:1}.scan-close{width:auto;padding:10px 14px;background:#fff;color:#123b5d}.scan-body{width:100%;max-width:900px;margin:0 auto;padding:16px}.scan-status{margin:0 0 12px}.scan-actions{display:flex;gap:10px;margin-top:12px}.scan-actions button{flex:1}.scan-note{background:#eef5fa;padding:12px;border-radius:10px;margin-top:10px;font-size:13px;color:#40566a}.scan-note strong{color:#123b5d}#mrz-reader{width:100%;max-width:888px;margin:0 auto;border-radius:14px;overflow:hidden;background:#0b1116;min-height:300px}
 .cie-camera{position:relative;width:100%;max-width:900px;margin:0 auto;background:#000;border-radius:14px;overflow:hidden}.cie-camera video{display:block;width:100%;max-height:60vh;object-fit:cover}.cie-guide{position:absolute;left:4%;top:50%;width:92%;aspect-ratio:85.6/54;transform:translateY(-50%);border:3px dashed #43e67b;border-radius:12px;box-shadow:0 0 0 9999px rgba(0,0,0,.28);pointer-events:none}.cie-guide-label{position:absolute;left:0;right:0;top:-34px;text-align:center;color:#fff;font-weight:700;font-size:13px;text-shadow:0 1px 3px #000}.cie-guide-hint{font-size:12px;color:#617487;margin-top:7px}.result-box{margin-top:12px;padding:12px;border-radius:10px;background:#eef8ef;border:1px solid #cde7d0}.warning-box{margin-top:12px;padding:12px;border-radius:10px;background:#fff6e8;border:1px solid #f0d7a8}
 </style>
@@ -33,7 +33,6 @@
 </div>
 <div class="small" style="margin-top:8px">La partenza è il giorno successivo all'ultima notte: 12/11 + 3 notti = 15/11. La differenza tra arrivo e partenza coincide con il numero di notti.</div>
 <div id="guests"></div>
-<datalist id="countryList"></datalist>
 <div class="row" style="margin-top:10px"><button class="secondary" onclick="addManual()">+ Inserisci manualmente</button><button onclick="saveStay()">Salva check-in</button></div>
 <div id="saveMsg" class="status hidden"></div>
 </div>
@@ -78,7 +77,22 @@ function countryName(code){const c=String(code||"").trim().toUpperCase(); return
 function api(path,opt={}){opt.headers={...(opt.headers||{}),Authorization:"Bearer "+token,"Content-Type":"application/json"};return fetch(path,opt)}
 function show(id,msg){const e=document.getElementById(id);e.textContent=msg;e.classList.remove("hidden")}
 
-async function login(){const r=await fetch("/api/login",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({username:user.value,password:pass.value})});const j=await r.json();if(j.ok){token=j.token;localStorage.setItem("checkin_token",token);document.getElementById("login").classList.add("hidden");document.getElementById("app").classList.remove("hidden");syncGuests();setDepartureFromNights();loadCountryCatalog()}else show("loginMsg",j.error||"Accesso negato")}
+let officialCountries=[];
+let officialCountriesLoaded=false;
+let nationalityTimers={};
+async function loadOfficialCountries(){
+ if(officialCountriesLoaded)return officialCountries;
+ try{const r=await api("/api/nazioni");const j=await r.json();if(!j.ok)throw new Error(j.error||"Elenco Stati non disponibile");officialCountries=Array.isArray(j.items)?j.items:[];officialCountriesLoaded=true;return officialCountries;}catch(e){officialCountries=[];return []}
+}
+function countryNorm(v){return String(v||"").normalize("NFD").replace(/[\u0300-\u036f]/g,"").toUpperCase().replace(/[^A-Z0-9]+/g," ").trim()}
+function countrySuggestionBox(index){return document.getElementById(`nationalitySuggestions_${index}`)}
+function clearNationalitySuggestions(index){const b=countrySuggestionBox(index);if(b){b.innerHTML="";b.classList.add("hidden")}}
+function renderNationalitySuggestions(index,query=""){const g=getGuest(index);if(!g)return;const b=countrySuggestionBox(index);if(!b)return;const q=countryNorm(query);const items=officialCountries.filter(x=>!q||countryNorm(x.nome).includes(q)).slice(0,80);b.innerHTML=items.map(x=>`<button type="button" data-name="${escapeHtml(x.nome)}" data-code="${escapeHtml(x.codice)}" onclick="selectNationality(${index},this)">${escapeHtml(x.nome)}</button>`).join("");b.classList.toggle("hidden",items.length===0)}
+async function openNationalityList(index){await loadOfficialCountries();renderNationalitySuggestions(index,getGuest(index)?.querySelector('[data-f="cittadinanza"]')?.value||"")}
+async function handleNationalityInput(index){const g=getGuest(index);if(!g)return;const field=g.querySelector('[data-f="cittadinanza"]'),code=g.querySelector('[data-f="cittadinanza_code"]');if(code)code.value="";if(field){field.dataset.countrySelected="0";field.dataset.countryCode=""}clearTimeout(nationalityTimers[index]);nationalityTimers[index]=setTimeout(async()=>{await loadOfficialCountries();renderNationalitySuggestions(index,field?.value||"")},100)}
+function selectNationality(index,button){const g=getGuest(index);if(!g)return;const field=g.querySelector('[data-f="cittadinanza"]'),code=g.querySelector('[data-f="cittadinanza_code"]');const name=button.dataset.name||"",cc=button.dataset.code||"";if(field){field.value=name;field.dataset.countrySelected="1";field.dataset.countryCode=cc}if(code)code.value=cc;const h=document.getElementById(`nationalityHint_${index}`);if(h)h.textContent=`Selezionato: ${name} — codice Alloggiati ${cc}`;clearNationalitySuggestions(index);syncPlacesFromNationality(index)}
+async function handleNationalityBlur(index){setTimeout(async()=>{const g=getGuest(index);if(!g)return;const field=g.querySelector('[data-f="cittadinanza"]'),code=g.querySelector('[data-f="cittadinanza_code"]');if(field?.dataset.countrySelected==="1")return;const typed=countryNorm(field?.value||"");if(!typed){clearNationalitySuggestions(index);return}await loadOfficialCountries();const exact=officialCountries.find(x=>countryNorm(x.nome)===typed);if(exact){selectNationality(index,{dataset:{name:exact.nome,code:exact.codice}});return}if(field)field.value="";if(code)code.value="";const h=document.getElementById(`nationalityHint_${index}`);if(h)h.textContent="Seleziona uno Stato dall'elenco ufficiale Alloggiati Web.";clearNationalitySuggestions(index);syncPlacesFromNationality(index)},180)}
+async function login(){const r=await fetch("/api/login",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({username:user.value,password:pass.value})});const j=await r.json();if(j.ok){token=j.token;localStorage.setItem("checkin_token",token);document.getElementById("login").classList.add("hidden");document.getElementById("app").classList.remove("hidden");syncGuests();setDepartureFromNights();loadOfficialCountries().catch(()=>{})}else show("loginMsg",j.error||"Accesso negato")}
 
 // Date handling deliberately avoids toISOString(), which converts midnight to UTC and
 // can shift an Italian calendar date back by one day.
@@ -106,7 +120,7 @@ function guestHtml(i){
 ${first
  ? `<div><label>Tipologia Alloggiato</label><select data-f="tipologia" onchange="updateGuestType(0)"><option value="ospite_singolo">Ospite singolo</option><option value="capo_famiglia">Capo famiglia</option><option value="capo_gruppo">Capo gruppo</option><option value="familiare">Familiare</option><option value="membro_gruppo">Membro gruppo</option></select></div>`
  : `<div><label>Tipologia Alloggiato</label><input data-f="tipologia" readonly value="ospite_singolo"></div>`}
-<div class="field-wrap"><label>Cittadinanza</label><input data-f="cittadinanza" list="countryList" autocomplete="off" placeholder="Cerca Stato…" oninput="handleCountryInput(${i-1})" onchange="handleCountryInput(${i-1})" onblur="setTimeout(()=>handleCountryBlur(${i-1}),150)"><input type="hidden" data-f="cittadinanza_code"><div class="municipality-hint" id="countryHint_${i-1}">Seleziona uno Stato dall'elenco ufficiale Alloggiati Web.</div></div>
+<div><label>Cittadinanza</label><div class="field-wrap"><input data-f="cittadinanza" autocomplete="off" oninput="handleNationalityInput(${i-1})" onfocus="openNationalityList(${i-1})" onblur="handleNationalityBlur(${i-1})"><input type="hidden" data-f="cittadinanza_code"><div id="nationalitySuggestions_${i-1}" class="country-suggestions hidden"></div></div><div id="nationalityHint_${i-1}" class="municipality-hint">Seleziona uno Stato dall'elenco ufficiale Alloggiati Web.</div></div>
 <div><label>Luogo di nascita</label><div class="field-wrap"><input data-f="luogo_nascita" autocomplete="off" oninput="handlePlaceInput(${i-1},'birth')" onblur="handlePlaceBlur(${i-1},'birth')"><div id="birthSuggestions_${i-1}" class="municipality-suggestions hidden"></div></div><div id="birthHint_${i-1}" class="municipality-hint"></div></div>
 <div><label>Cognome</label><input data-f="cognome"></div>
 <div><label>Nome</label><input data-f="nome"></div>
@@ -136,64 +150,9 @@ function updateGuestType(index){
  if(index===0) applyHeadGuestRule();
 }
 function isItalianNationality(value){
- const v=String(value||"").trim().normalize("NFD").replace(/[\u0300-\u036f]/g,"").toUpperCase();
- return v==="ITALIA"||v==="ITALIAN"||v==="ITA"||v==="100000100";
-}
-function countryCodeFromGuest(g){return String(g?.querySelector('[data-f="cittadinanza_code"]')?.value||"").trim()}
-function countryNameFromCode(code){
- const c=String(code||"").trim();
- return (window.__countryCatalog||[]).find(x=>String(x.code)===c)?.name||c;
-}
-function normalizeCountryName(v){return String(v||"").trim().normalize("NFD").replace(/[\u0300-\u036f]/g,"").toUpperCase();}
-function findCountryByInput(v){
- const n=normalizeCountryName(v); if(!n)return null;
- const list=window.__countryCatalog||[];
- return list.find(x=>normalizeCountryName(x.name)===n)||list.find(x=>normalizeCountryName(x.code)===n)||list.find(x=>normalizeCountryName(x.iso2||"")===n)||null;
-}
-async function loadCountryCatalog(){
- if(window.__countryCatalogLoaded)return;
- try{
-   const r=await api('/api/nazioni'); const j=await r.json();
-   if(!j.ok||!Array.isArray(j.items))throw new Error(j.error||'Nazioni non disponibili');
-   window.__countryCatalog=j.items;
-   const dl=document.getElementById('countryList');
-   if(dl)dl.innerHTML=j.items.map(x=>`<option value="${escapeHtml(x.name)}" label="${escapeHtml(x.code)}"></option>`).join('');
-   window.__countryCatalogLoaded=true;
- }catch(e){
-   window.__countryCatalog=[];
-   const hint=document.querySelector('.municipality-hint[id^="countryHint_"]');
-   if(hint)hint.textContent='Elenco Stati non disponibile: riprova tra poco.';
- }
-}
-function setCountryForGuest(index,country){
- const g=getGuest(index);if(!g||!country)return false;
- const nameEl=g.querySelector('[data-f="cittadinanza"]');
- const codeEl=g.querySelector('[data-f="cittadinanza_code"]');
- if(nameEl)nameEl.value=country.name;
- if(codeEl)codeEl.value=country.code;
- const h=document.getElementById(`countryHint_${index}`);if(h)h.textContent=`${country.name} — codice Alloggiati ${country.code}`;
- syncPlacesFromNationality(index);
- return true;
-}
-function handleCountryInput(index){
- const g=getGuest(index);if(!g)return;
- const value=g.querySelector('[data-f="cittadinanza"]')?.value||'';
- const country=findCountryByInput(value);
- const codeEl=g.querySelector('[data-f="cittadinanza_code"]');
- if(country){
-   setCountryForGuest(index,country);
- }else{
-   if(codeEl)codeEl.value='';
-   const h=document.getElementById(`countryHint_${index}`);if(h)h.textContent="Seleziona uno Stato dall'elenco ufficiale Alloggiati Web.";
- }
-}
-function handleCountryBlur(index){
- const g=getGuest(index);if(!g)return;
- const field=g.querySelector('[data-f="cittadinanza"]');if(!field)return;
- const country=findCountryByInput(field.value);
- if(country){setCountryForGuest(index,country);return;}
- if(field.value.trim()){field.value='';const codeEl=g.querySelector('[data-f="cittadinanza_code"]');if(codeEl)codeEl.value='';}
- syncPlacesFromNationality(index);
+ const v=countryNorm(value);
+ if(v==="ITALIA"||v==="ITALIAN"||v==="ITA")return true;
+ return officialCountries.some(x=>countryNorm(x.nome)===v&&String(x.codice)==="100000100");
 }
 function placeField(index,kind){
  const g=getGuest(index);if(!g)return null;
@@ -215,6 +174,9 @@ function markIssuingPlaceManual(index){
 function syncPlacesFromNationality(index){
  const g=getGuest(index);if(!g)return;
  const c=g.querySelector('[data-f="cittadinanza"]')?.value?.trim();
+ const cf=g.querySelector('[data-f="cittadinanza"]');
+ const cc=g.querySelector('[data-f="cittadinanza_code"]')?.value?.trim();
+ if(cf&&cc)cf.dataset.countryCode=cc;
  const b=g.querySelector('[data-f="luogo_nascita"]');
  const i=g.querySelector('[data-f="luogo_rilascio_documento"]');
  if(!c){clearPlaceSuggestions(index,'birth');clearPlaceSuggestions(index,'issue');return;}
@@ -288,6 +250,7 @@ function handlePlaceBlur(index,kind){
 function collectGuests(){
  return [...document.querySelectorAll(".guest")].map(g=>{
    const o=Object.fromEntries([...g.querySelectorAll("[data-f]")].map(x=>[x.dataset.f,x.value]));
+   if(o.cittadinanza_code) o.cittadinanza_code=String(o.cittadinanza_code).trim();
    if(o.cittadinanza && isItalianNationality(o.cittadinanza)){
      o.provincia_nascita=String(g.dataset.birthProvince||g.querySelector('[data-f="luogo_nascita"]')?.dataset.municipalityProvince||"").toUpperCase();
    }
@@ -297,18 +260,7 @@ function collectGuests(){
    return o;
  });
 }
-async function saveStay(){
- setNightsFromDates();
- if(!arrival.value||!departure.value||Number(nights.value)<1){show("saveMsg","Controlla arrivo e partenza: la partenza deve essere successiva all'arrivo.");return}
- await loadCountryCatalog();
- const gs=collectGuests();
- const invalid=gs.findIndex(g=>!String(g.cittadinanza_code||"").trim());
- if(invalid>=0){show("saveMsg",`Ospite ${invalid+1}: seleziona la cittadinanza dall'elenco ufficiale Alloggiati Web.`);return}
- const r=await api("/api/stays",{method:"POST",body:JSON.stringify({arrival:arrival.value,nights:Number(nights.value),departure:departure.value,guests:gs})});
- const j=await r.json();
- show("saveMsg",j.ok?`Check-in salvato. ID ${j.id}`:(j.error||"Errore"));
- if(j.ok){document.getElementById("sendBox").classList.remove("hidden");window.lastStayId=j.id}
-}
+async function saveStay(){setNightsFromDates();if(!arrival.value||!departure.value||Number(nights.value)<1){show("saveMsg","Controlla arrivo e partenza: la partenza deve essere successiva all'arrivo.");return}const gs=collectGuests();const r=await api("/api/stays",{method:"POST",body:JSON.stringify({arrival:arrival.value,nights:Number(nights.value),departure:departure.value,guests:gs})});const j=await r.json();show("saveMsg",j.ok?`Check-in salvato. ID ${j.id}`:(j.error||"Errore")); if(j.ok){document.getElementById("sendBox").classList.remove("hidden");window.lastStayId=j.id}}
 
 function mrzDate(v){if(!/^[0-9]{6}$/.test(v))return "";const yy=Number(v.slice(0,2)),mm=v.slice(2,4),dd=v.slice(4,6);const year=yy>=50?1900+yy:2000+yy;return `${year}-${mm}-${dd}`}
 
@@ -322,14 +274,14 @@ function scanGuestMrz(index){
  startMrzScanner();
 }
 
-function applyMrzResult(result){
+async function applyMrzResult(result){
+ await loadOfficialCountries();
  const p=result?.parsed;
  if(!p || typeof p!=="object") return false;
  const g=getGuest(activeGuestIndex); if(!g) return false;
  const get=(...keys)=>{for(const k of keys){if(p[k]!=null&&String(p[k]).trim()!=="")return String(p[k]).trim()}return ""};
  const sex=get("Gender");
- const nationalityCodeMrz=get("Nationality");
- const nationality=countryName(nationalityCodeMrz);
+ const nationality=countryName(get("Nationality"));
  const issuing=countryName(get("Issuing Country"));
  const data={
    nome:get("Given Names"),
@@ -344,13 +296,11 @@ function applyMrzResult(result){
  // Dopo aver letto la cittadinanza dalla MRZ, applica immediatamente la regola
  // del luogo di nascita/rilascio: per stranieri = Paese; per italiani = Comune.
  if(nationality){
-   const officialCountry=findCountryByInput(nationality)||findCountryByInput(nationalityCodeMrz);
-   if(officialCountry) setCountryForGuest(activeGuestIndex,officialCountry);
-   else {
-     const citEl=g.querySelector('[data-f="cittadinanza"]');
-     if(citEl)citEl.value=nationality;
-     syncPlacesFromNationality(activeGuestIndex);
-   }
+   const citEl=g.querySelector('[data-f="cittadinanza"]');
+   const codeEl=g.querySelector('[data-f="cittadinanza_code"]');
+   const match=officialCountries.find(x=>countryNorm(x.nome)===countryNorm(nationality));
+   if(citEl&&match){citEl.value=match.nome;citEl.dataset.countrySelected="1";citEl.dataset.countryCode=match.codice;if(codeEl)codeEl.value=match.codice;}
+   syncPlacesFromNationality(activeGuestIndex);
  }
  const validation=p.Validation;
  return validation?.isValid===true;
@@ -516,7 +466,7 @@ function applyCieStructuredResult(r){
  const name=cleanStructuredPerson(r.name?.text);
  const birth=parseStructuredBirth(r.birth?.text||"");
  const issuer=cleanStructuredPlace(r.issuer?.text);
- const nat=/\bITA\b/.test(r.nationality?.text||"")?"Italia":"";
+ const natRaw=normalizeFieldText(r.nationality?.text||""); const nat=officialCountries.find(x=>countryNorm(natRaw).includes(countryNorm(x.nome)))?.nome || (/\bITA\b/.test(natRaw)?"Italia":"");
  const sex=/\bF\b/.test(r.sex?.text||"")?"F":/\bM\b/.test(r.sex?.text||"")?"M":"";
  const serial=String(r.serial?.text||"").replace(/[^A-Z0-9]/g,"");
  // Non inseriamo mai un campo solo perché contiene del testo: ciascun campo
@@ -524,7 +474,7 @@ function applyCieStructuredResult(r){
  if(/^[A-ZÀ-ÖØ-Ý' -]{2,40}$/.test(surname)&&!/(COGNOME|SURNAME|NOME|NAME)/.test(surname))set("cognome",surname);
  if(/^[A-ZÀ-ÖØ-Ý' -]{2,40}$/.test(name)&&!/(COGNOME|SURNAME|NOME|NAME)/.test(name))set("nome",name);
  if(birth.date)set("nascita",birth.date);
- if(nat)set("cittadinanza",nat);
+ if(nat){set("cittadinanza",nat);const ce=g.querySelector('[data-f="cittadinanza_code"]');const cm=officialCountries.find(x=>countryNorm(x.nome)===countryNorm(nat));if(ce&&cm)ce.value=cm.codice;const citEl=g.querySelector('[data-f="cittadinanza"]');if(citEl&&cm){citEl.dataset.countrySelected="1";citEl.dataset.countryCode=cm.codice;}}
  if(sex)set("sesso",sex);
  set("tipo_documento","Carta d'identità");
  if(/^[A-Z0-9]{8,12}$/.test(serial))set("numero_documento",serial);
@@ -584,6 +534,6 @@ function showHistory(){api("/api/stays").then(r=>r.json()).then(rows=>show("serv
 document.getElementById("arrival").addEventListener("change",()=>setDepartureFromNights());
 document.getElementById("departure").addEventListener("change",setNightsFromDates);
 document.getElementById("nights").addEventListener("change",setDepartureFromNights);
-if(token){document.getElementById("login").classList.add("hidden");document.getElementById("app").classList.remove("hidden");syncGuests();setDepartureFromNights();loadCountryCatalog()}
+if(token){document.getElementById("login").classList.add("hidden");document.getElementById("app").classList.remove("hidden");syncGuests();setDepartureFromNights()}
 </script>
 </body></html>
