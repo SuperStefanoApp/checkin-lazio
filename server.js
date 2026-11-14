@@ -319,17 +319,23 @@ async function rossSend(stay){
     if(/^\d{6,9}$/.test(String(v).trim())) return String(v).trim();
     return nationCsv?findCode(nationCsv,v):String(v).trim();
   };
+  // ROSS richiede un idswh univoco per ogni record della stessa struttura.
+  // Deve inoltre restare invariato se lo stesso soggiorno viene ritrasmesso.
+  // Usiamo quindi l'ID persistente del soggiorno + anno + indice ospite,
+  // mantenendo il valore entro i 20 caratteri previsti dal tracciato.
+  const rossRecordId=(guestIndex)=>`CL${String(stay.arrival||"").slice(0,4)}${String(stay.id)}-${guestIndex+1}`;
   const arrivi=stay.guests.map((g,i)=>{
     const guestType=String(g.tipologia||"ospite_singolo");
     const typeCode=rossTypeCodes[guestType]||"16";
-    const idcapo=(guestType==="familiare"||guestType==="membro_gruppo")?`${stay.id}-1`:"";
+    const idcapo=(guestType==="familiare"||guestType==="membro_gruppo")?rossRecordId(0):"";
+    const idswh=rossRecordId(i);
     const cittadinanza=codeOrValue(g.cittadinanza_code||g.cittadinanza);
     const statoResidenza=codeOrValue(g.residenza_stato_code||g.residenza_stato||g.cittadinanza);
     let luogoResidenza=String(g.residenza_luogo||"").trim();
     if(!luogoResidenza && !/^100000100$/.test(statoResidenza)) luogoResidenza=String(g.cittadinanza||"").trim();
     const comuneNascita=String(g.comune_nascita_code||"").trim();
     const statoNascita=codeOrValue(g.stato_nascita_code||g.stato_nascita||g.cittadinanza);
-    return `<arrivo><idswh>${rossXmlEscape(`${stay.id}-${i+1}`)}</idswh><tipoalloggiato>${typeCode}</tipoalloggiato><idcapo>${rossXmlEscape(idcapo)}</idcapo><cognome>${rossXmlEscape(g.cognome)}</cognome><nome>${rossXmlEscape(g.nome)}</nome><sesso>${g.sesso||""}</sesso><cittadinanza>${rossXmlEscape(cittadinanza)}</cittadinanza><statoresidenza>${rossXmlEscape(statoResidenza)}</statoresidenza><luogoresidenza>${rossXmlEscape(statoResidenza==="100000100"?(g.residenza_luogo_code||luogoResidenza):luogoResidenza)}</luogoresidenza><datanascita>${yyyymmdd(g.nascita)}</datanascita><statonascita>${rossXmlEscape(statoNascita)}</statonascita><comunenascita>${rossXmlEscape(statoNascita==="100000100"?comuneNascita:"")}</comunenascita><tipoturismo>${rossXmlEscape(g.tipoturismo||tourism)}</tipoturismo><mezzotrasporto>${rossXmlEscape(g.mezzotrasporto||transport)}</mezzotrasporto><canaleprenotazione>${rossXmlEscape(g.canaleprenotazione||channel)}</canaleprenotazione><titolostudio>${rossXmlEscape(g.titolostudio||"")}</titolostudio><professione>${rossXmlEscape(g.professione||"")}</professione><esenzioneimposta>${rossXmlEscape(g.esenzioneimposta||"")}</esenzioneimposta></arrivo>`;
+    return `<arrivo><idswh>${rossXmlEscape(idswh)}</idswh><tipoalloggiato>${typeCode}</tipoalloggiato><idcapo>${rossXmlEscape(idcapo)}</idcapo><cognome>${rossXmlEscape(g.cognome)}</cognome><nome>${rossXmlEscape(g.nome)}</nome><sesso>${g.sesso||""}</sesso><cittadinanza>${rossXmlEscape(cittadinanza)}</cittadinanza><statoresidenza>${rossXmlEscape(statoResidenza)}</statoresidenza><luogoresidenza>${rossXmlEscape(statoResidenza==="100000100"?(g.residenza_luogo_code||luogoResidenza):luogoResidenza)}</luogoresidenza><datanascita>${yyyymmdd(g.nascita)}</datanascita><statonascita>${rossXmlEscape(statoNascita)}</statonascita><comunenascita>${rossXmlEscape(statoNascita==="100000100"?comuneNascita:"")}</comunenascita><tipoturismo>${rossXmlEscape(g.tipoturismo||tourism)}</tipoturismo><mezzotrasporto>${rossXmlEscape(g.mezzotrasporto||transport)}</mezzotrasporto><canaleprenotazione>${rossXmlEscape(g.canaleprenotazione||channel)}</canaleprenotazione><titolostudio>${rossXmlEscape(g.titolostudio||"")}</titolostudio><professione>${rossXmlEscape(g.professione||"")}</professione><esenzioneimposta>${rossXmlEscape(g.esenzioneimposta||"")}</esenzioneimposta></arrivo>`;
   }).join("");
   const xml=`<?xml version="1.0" encoding="UTF-8"?><S:Envelope xmlns:S="http://schemas.xmlsoap.org/soap/envelope/"><S:Body><ns2:inviaMovimentazione xmlns:ns2="http://checkin.ws.service.turismo5.gies.it/"><movimentazione><codice>${rossXmlEscape(process.env.ROSS_STRUCTURE_CODE)}</codice><prodotto>${rossXmlEscape(product)}</prodotto><movimento><data>${yyyymmdd(stay.arrival)}</data><struttura><apertura>SI</apertura><camereoccupate>${roomOccupied}</camereoccupate><cameredisponibili>${roomsAvailable}</cameredisponibili><lettidisponibili>${bedsAvailable}</lettidisponibili></struttura><arrivi>${arrivi}</arrivi></movimento></movimentazione></ns2:inviaMovimentazione></S:Body></S:Envelope>`;
   const auth=Buffer.from(`${process.env.ROSS_USER}:${process.env.ROSS_PASSWORD}`).toString("base64");
@@ -340,7 +346,7 @@ async function rossSend(stay){
   if(fault) return {ok:false,status:"error",error:fault,raw:text.slice(0,5000)};
   const responseError=tag(text,"ErroreDettaglio")||tag(text,"errore")||tag(text,"error");
   if(responseError) return {ok:false,status:"error",error:`ROSS 1000: ${responseError}`,raw:text.slice(0,5000)};
-  return {ok:true,status:"sent",message:"ROSS 1000: richiesta SOAP inviata. Camera occupata conteggiata una sola volta; per familiari/membri di gruppo sono stati inviati tipo e idcapo previsti.",raw:text.slice(0,5000)};
+  return {ok:true,status:"sent",message:"ROSS 1000: richiesta SOAP inviata. Identificativi idswh univoci per il soggiorno; camera occupata conteggiata una sola volta; per familiari/membri di gruppo sono stati inviati tipo e idcapo previsti.",raw:text.slice(0,5000)};
 }
 
 app.get(/.*/, (req,res)=>res.sendFile(path.join(__dirname,"public","index.html")));
