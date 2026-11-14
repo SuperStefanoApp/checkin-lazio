@@ -33,6 +33,7 @@
 </div>
 <div class="small" style="margin-top:8px">La partenza è il giorno successivo all'ultima notte: 12/11 + 3 notti = 15/11. La differenza tra arrivo e partenza coincide con il numero di notti.</div>
 <div id="guests"></div>
+<datalist id="countryList"></datalist>
 <div class="row" style="margin-top:10px"><button class="secondary" onclick="addManual()">+ Inserisci manualmente</button><button onclick="saveStay()">Salva check-in</button></div>
 <div id="saveMsg" class="status hidden"></div>
 </div>
@@ -77,7 +78,7 @@ function countryName(code){const c=String(code||"").trim().toUpperCase(); return
 function api(path,opt={}){opt.headers={...(opt.headers||{}),Authorization:"Bearer "+token,"Content-Type":"application/json"};return fetch(path,opt)}
 function show(id,msg){const e=document.getElementById(id);e.textContent=msg;e.classList.remove("hidden")}
 
-async function login(){const r=await fetch("/api/login",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({username:user.value,password:pass.value})});const j=await r.json();if(j.ok){token=j.token;localStorage.setItem("checkin_token",token);document.getElementById("login").classList.add("hidden");document.getElementById("app").classList.remove("hidden");syncGuests();setDepartureFromNights()}else show("loginMsg",j.error||"Accesso negato")}
+async function login(){const r=await fetch("/api/login",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({username:user.value,password:pass.value})});const j=await r.json();if(j.ok){token=j.token;localStorage.setItem("checkin_token",token);document.getElementById("login").classList.add("hidden");document.getElementById("app").classList.remove("hidden");syncGuests();setDepartureFromNights();loadCountryCatalog()}else show("loginMsg",j.error||"Accesso negato")}
 
 // Date handling deliberately avoids toISOString(), which converts midnight to UTC and
 // can shift an Italian calendar date back by one day.
@@ -105,7 +106,7 @@ function guestHtml(i){
 ${first
  ? `<div><label>Tipologia Alloggiato</label><select data-f="tipologia" onchange="updateGuestType(0)"><option value="ospite_singolo">Ospite singolo</option><option value="capo_famiglia">Capo famiglia</option><option value="capo_gruppo">Capo gruppo</option><option value="familiare">Familiare</option><option value="membro_gruppo">Membro gruppo</option></select></div>`
  : `<div><label>Tipologia Alloggiato</label><input data-f="tipologia" readonly value="ospite_singolo"></div>`}
-<div><label>Cittadinanza</label><input data-f="cittadinanza" oninput="syncPlacesFromNationality(${i-1})" onchange="syncPlacesFromNationality(${i-1})" onblur="syncPlacesFromNationality(${i-1})"></div>
+<div class="field-wrap"><label>Cittadinanza</label><input data-f="cittadinanza" list="countryList" autocomplete="off" placeholder="Cerca Stato…" oninput="handleCountryInput(${i-1})" onchange="handleCountryInput(${i-1})" onblur="setTimeout(()=>handleCountryBlur(${i-1}),150)"><input type="hidden" data-f="cittadinanza_code"><div class="municipality-hint" id="countryHint_${i-1}">Seleziona uno Stato dall'elenco ufficiale Alloggiati Web.</div></div>
 <div><label>Luogo di nascita</label><div class="field-wrap"><input data-f="luogo_nascita" autocomplete="off" oninput="handlePlaceInput(${i-1},'birth')" onblur="handlePlaceBlur(${i-1},'birth')"><div id="birthSuggestions_${i-1}" class="municipality-suggestions hidden"></div></div><div id="birthHint_${i-1}" class="municipality-hint"></div></div>
 <div><label>Cognome</label><input data-f="cognome"></div>
 <div><label>Nome</label><input data-f="nome"></div>
@@ -136,7 +137,63 @@ function updateGuestType(index){
 }
 function isItalianNationality(value){
  const v=String(value||"").trim().normalize("NFD").replace(/[\u0300-\u036f]/g,"").toUpperCase();
- return v==="ITALIA"||v==="ITALIAN"||v==="ITA";
+ return v==="ITALIA"||v==="ITALIAN"||v==="ITA"||v==="100000100";
+}
+function countryCodeFromGuest(g){return String(g?.querySelector('[data-f="cittadinanza_code"]')?.value||"").trim()}
+function countryNameFromCode(code){
+ const c=String(code||"").trim();
+ return (window.__countryCatalog||[]).find(x=>String(x.code)===c)?.name||c;
+}
+function normalizeCountryName(v){return String(v||"").trim().normalize("NFD").replace(/[\u0300-\u036f]/g,"").toUpperCase();}
+function findCountryByInput(v){
+ const n=normalizeCountryName(v); if(!n)return null;
+ const list=window.__countryCatalog||[];
+ return list.find(x=>normalizeCountryName(x.name)===n)||list.find(x=>normalizeCountryName(x.code)===n)||list.find(x=>normalizeCountryName(x.iso2||"")===n)||null;
+}
+async function loadCountryCatalog(){
+ if(window.__countryCatalogLoaded)return;
+ try{
+   const r=await api('/api/nazioni'); const j=await r.json();
+   if(!j.ok||!Array.isArray(j.items))throw new Error(j.error||'Nazioni non disponibili');
+   window.__countryCatalog=j.items;
+   const dl=document.getElementById('countryList');
+   if(dl)dl.innerHTML=j.items.map(x=>`<option value="${escapeHtml(x.name)}" label="${escapeHtml(x.code)}"></option>`).join('');
+   window.__countryCatalogLoaded=true;
+ }catch(e){
+   window.__countryCatalog=[];
+   const hint=document.querySelector('.municipality-hint[id^="countryHint_"]');
+   if(hint)hint.textContent='Elenco Stati non disponibile: riprova tra poco.';
+ }
+}
+function setCountryForGuest(index,country){
+ const g=getGuest(index);if(!g||!country)return false;
+ const nameEl=g.querySelector('[data-f="cittadinanza"]');
+ const codeEl=g.querySelector('[data-f="cittadinanza_code"]');
+ if(nameEl)nameEl.value=country.name;
+ if(codeEl)codeEl.value=country.code;
+ const h=document.getElementById(`countryHint_${index}`);if(h)h.textContent=`${country.name} — codice Alloggiati ${country.code}`;
+ syncPlacesFromNationality(index);
+ return true;
+}
+function handleCountryInput(index){
+ const g=getGuest(index);if(!g)return;
+ const value=g.querySelector('[data-f="cittadinanza"]')?.value||'';
+ const country=findCountryByInput(value);
+ const codeEl=g.querySelector('[data-f="cittadinanza_code"]');
+ if(country){
+   setCountryForGuest(index,country);
+ }else{
+   if(codeEl)codeEl.value='';
+   const h=document.getElementById(`countryHint_${index}`);if(h)h.textContent="Seleziona uno Stato dall'elenco ufficiale Alloggiati Web.";
+ }
+}
+function handleCountryBlur(index){
+ const g=getGuest(index);if(!g)return;
+ const field=g.querySelector('[data-f="cittadinanza"]');if(!field)return;
+ const country=findCountryByInput(field.value);
+ if(country){setCountryForGuest(index,country);return;}
+ if(field.value.trim()){field.value='';const codeEl=g.querySelector('[data-f="cittadinanza_code"]');if(codeEl)codeEl.value='';}
+ syncPlacesFromNationality(index);
 }
 function placeField(index,kind){
  const g=getGuest(index);if(!g)return null;
@@ -240,7 +297,18 @@ function collectGuests(){
    return o;
  });
 }
-async function saveStay(){setNightsFromDates();if(!arrival.value||!departure.value||Number(nights.value)<1){show("saveMsg","Controlla arrivo e partenza: la partenza deve essere successiva all'arrivo.");return}const gs=collectGuests();const r=await api("/api/stays",{method:"POST",body:JSON.stringify({arrival:arrival.value,nights:Number(nights.value),departure:departure.value,guests:gs})});const j=await r.json();show("saveMsg",j.ok?`Check-in salvato. ID ${j.id}`:(j.error||"Errore")); if(j.ok){document.getElementById("sendBox").classList.remove("hidden");window.lastStayId=j.id}}
+async function saveStay(){
+ setNightsFromDates();
+ if(!arrival.value||!departure.value||Number(nights.value)<1){show("saveMsg","Controlla arrivo e partenza: la partenza deve essere successiva all'arrivo.");return}
+ await loadCountryCatalog();
+ const gs=collectGuests();
+ const invalid=gs.findIndex(g=>!String(g.cittadinanza_code||"").trim());
+ if(invalid>=0){show("saveMsg",`Ospite ${invalid+1}: seleziona la cittadinanza dall'elenco ufficiale Alloggiati Web.`);return}
+ const r=await api("/api/stays",{method:"POST",body:JSON.stringify({arrival:arrival.value,nights:Number(nights.value),departure:departure.value,guests:gs})});
+ const j=await r.json();
+ show("saveMsg",j.ok?`Check-in salvato. ID ${j.id}`:(j.error||"Errore"));
+ if(j.ok){document.getElementById("sendBox").classList.remove("hidden");window.lastStayId=j.id}
+}
 
 function mrzDate(v){if(!/^[0-9]{6}$/.test(v))return "";const yy=Number(v.slice(0,2)),mm=v.slice(2,4),dd=v.slice(4,6);const year=yy>=50?1900+yy:2000+yy;return `${year}-${mm}-${dd}`}
 
@@ -260,7 +328,8 @@ function applyMrzResult(result){
  const g=getGuest(activeGuestIndex); if(!g) return false;
  const get=(...keys)=>{for(const k of keys){if(p[k]!=null&&String(p[k]).trim()!=="")return String(p[k]).trim()}return ""};
  const sex=get("Gender");
- const nationality=countryName(get("Nationality"));
+ const nationalityCodeMrz=get("Nationality");
+ const nationality=countryName(nationalityCodeMrz);
  const issuing=countryName(get("Issuing Country"));
  const data={
    nome:get("Given Names"),
@@ -275,9 +344,13 @@ function applyMrzResult(result){
  // Dopo aver letto la cittadinanza dalla MRZ, applica immediatamente la regola
  // del luogo di nascita/rilascio: per stranieri = Paese; per italiani = Comune.
  if(nationality){
-   const citEl=g.querySelector('[data-f="cittadinanza"]');
-   if(citEl)citEl.value=nationality;
-   syncPlacesFromNationality(activeGuestIndex);
+   const officialCountry=findCountryByInput(nationality)||findCountryByInput(nationalityCodeMrz);
+   if(officialCountry) setCountryForGuest(activeGuestIndex,officialCountry);
+   else {
+     const citEl=g.querySelector('[data-f="cittadinanza"]');
+     if(citEl)citEl.value=nationality;
+     syncPlacesFromNationality(activeGuestIndex);
+   }
  }
  const validation=p.Validation;
  return validation?.isValid===true;
@@ -511,6 +584,6 @@ function showHistory(){api("/api/stays").then(r=>r.json()).then(rows=>show("serv
 document.getElementById("arrival").addEventListener("change",()=>setDepartureFromNights());
 document.getElementById("departure").addEventListener("change",setNightsFromDates);
 document.getElementById("nights").addEventListener("change",setDepartureFromNights);
-if(token){document.getElementById("login").classList.add("hidden");document.getElementById("app").classList.remove("hidden");syncGuests();setDepartureFromNights()}
+if(token){document.getElementById("login").classList.add("hidden");document.getElementById("app").classList.remove("hidden");syncGuests();setDepartureFromNights();loadCountryCatalog()}
 </script>
 </body></html>
