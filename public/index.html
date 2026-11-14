@@ -356,34 +356,127 @@ async function startCieOcr(){
 async function captureCieOcr(){
  const video=document.getElementById("cieVideo"),canvas=document.getElementById("cieCanvas"),msg=document.getElementById("cieOcrMsg");
  if(!video.videoWidth){show("cieOcrMsg","Fotocamera non pronta. Riprova tra un secondo.");return}
- canvas.width=video.videoWidth;canvas.height=video.videoHeight;canvas.getContext("2d").drawImage(video,0,0);
+ // CIE OCR: lavoriamo su una copia ingrandita e contrastata. Il fronte della CIE
+ // contiene testi molto piccoli e poco contrastati; passare direttamente il frame
+ // originale a Tesseract produce facilmente valori come "/ NAME dà =".
+ const scale=2;
+ canvas.width=Math.round(video.videoWidth*scale);canvas.height=Math.round(video.videoHeight*scale);
+ const ctx=canvas.getContext("2d",{willReadFrequently:true});
+ ctx.drawImage(video,0,0,canvas.width,canvas.height);
+ const img=ctx.getImageData(0,0,canvas.width,canvas.height), d=img.data;
+ for(let i=0;i<d.length;i+=4){
+   const y=(0.299*d[i]+0.587*d[i+1]+0.114*d[i+2]);
+   // Contrasto + leggera luminosità, mantenendo il testo scuro leggibile.
+   const v=Math.max(0,Math.min(255,((y-128)*1.55)+145));
+   d[i]=d[i+1]=d[i+2]=v;
+ }
+ ctx.putImageData(img,0,0);
  show("cieOcrMsg","Analisi OCR in corso…");
  try{
    const {createWorker}=await import("https://esm.sh/tesseract.js@5.1.1");
    const worker=await createWorker("ita+eng");
+   try{await worker.setParameters({tessedit_pageseg_mode:"6",preserve_interword_spaces:"1"})}catch(e){}
    const {data}=await worker.recognize(canvas);
    await worker.terminate();
-   parseCieOcr(data.text||"");
+   parseCieOcr(data);
  }catch(e){show("cieOcrMsg","OCR non riuscito. Riprova con la CIE più ferma, ben illuminata e senza riflessi.")}
 }
-function parseCieOcr(text){
+
+function cleanOcrLine(v){
+ return String(v||"").replace(/[|¦]/g," ").replace(/[“”‘’]/g,"'").replace(/\s+/g," ").trim();
+}
+function ocrLines(data){
+ const raw=typeof data==="string"?data:(data?.text||"");
+ return raw.split(/\r?\n/).map(cleanOcrLine).filter(Boolean);
+}
+function nextOcrValue(lines,index,limit=2){
+ for(let j=index+1;j<Math.min(lines.length,index+1+limit);j++){
+   const v=cleanOcrLine(lines[j]);
+   if(v && !/^(?:COGNOME|SURNAME|NOME|NAME|SESSO|SEX|CITTADINANZA|NATIONALITY|EMISSIONE|ISSUING|SCADENZA|EXPIRY)$/i.test(v)) return v;
+ }
+ return "";
+}
+function firstDate(s){
+ const m=String(s||"").match(/\b(\d{1,2})[\/.\-](\d{1,2})[\/.\-](\d{4})\b/);
+ return m?`${m[3]}-${String(m[2]).padStart(2,"0")}-${String(m[1]).padStart(2,"0")}`:"";
+}
+function stripCieValue(v){
+ return cleanOcrLine(v).replace(/^[:\-\s]+/,'').replace(/\s{2,}/g,' ').trim();
+}
+function parseCieOcr(data){
  const g=getGuest(activeGuestIndex); if(!g)return;
- const t=text.replace(/\r/g,"\n");
- const set=(f,v)=>{const el=g.querySelector(`[data-f="${f}"]`);if(el&&v)el.value=v.trim()};
- const upper=t.toUpperCase();
- const birth=/\b(?:LUOGO|PLACE)\s*(?:DI\s*)?(?:NASCITA|BIRTH)\s*[:\-]?\s*([^\n]+)/i.exec(t);
- const issue=/(?:LUOGO|PLACE)\s*(?:DI\s*)?(?:RILASCIO|EMISSIONE|ISSUE|ISSUED)\s*[:\-]?\s*([^\n]+)/i.exec(t);
- if(birth){set("luogo_nascita",birth[1]);g.dataset.birthplaceManual="1";}
- if(issue){set("luogo_rilascio_documento",issue[1]);g.dataset.issuingPlaceManual="1";}
- const num=/(?:N\.?|NUMERO|DOCUMENT(?:O| NO\.?)?)\s*[:\-]?\s*([A-Z0-9]{5,})/i.exec(upper);
- if(num)set("numero_documento",num[1]);
- const name=/(?:COGNOME|SURNAME)\s*[:\-]?\s*([^\n]+)/i.exec(t); if(name)set("cognome",name[1]);
- const given=/(?:NOME|GIVEN NAMES?)\s*[:\-]?\s*([^\n]+)/i.exec(t); if(given)set("nome",given[1]);
- const dob=/(?:DATA DI NASCITA|DATE OF BIRTH)\s*[:\-]?\s*(\d{1,2}[\/\.-]\d{1,2}[\/\.-]\d{4})/i.exec(t);
- if(dob){const m=dob[1].match(/(\d{1,2})[\/\.-](\d{1,2})[\/\.-](\d{4})/);if(m)set("nascita",`${m[3]}-${String(m[2]).padStart(2,"0")}-${String(m[1]).padStart(2,"0")}`)}
- const cit=/CITTADINANZA\s*[:\-]?\s*([^\n]+)/i.exec(t);if(cit){set("cittadinanza",cit[1]);syncPlacesFromNationality(activeGuestIndex)}
- const gend=/(?:SESSO|SEX)\s*[:\-]?\s*([MF])/i.exec(upper);if(gend)set("sesso",gend[1]);
- show("cieOcrMsg","✓ Analisi completata. Controlla i campi compilati automaticamente: l'OCR può richiedere una correzione manuale.");
+ const lines=ocrLines(data);
+ const full=lines.join("\n");
+ const upper=full.toUpperCase();
+ const set=(f,v)=>{const el=g.querySelector(`[data-f="${f}"]`);if(el&&v)el.value=String(v).trim()};
+ const findAfter=(patterns,limit=2)=>{
+   for(let i=0;i<lines.length;i++){
+     if(patterns.some(rx=>rx.test(lines[i]))) return stripCieValue(nextOcrValue(lines,i,limit));
+   }
+   return "";
+ };
+
+ // CIE italiana: le diciture reali sono spesso spezzate su due righe.
+ // Cerchiamo quindi prima l'etichetta e poi il valore nelle righe successive,
+ // invece di aspettarci "ETICHETTA: valore" sulla stessa riga.
+ let surname=findAfter([/\bCOGNOME\b/i,/\bSURNAME\b/i]);
+ let given=findAfter([/^NOME(?:\s*\/\s*NAME)?$/i,/\bNOME\b.*\bNAME\b/i]);
+ let birthBlock=findAfter([/LUOGO\s*(?:E|DI)\s*DATA\s*DI\s*NASCITA/i,/PLACE\s*AND\s*DATE\s*OF\s*BIRTH/i],3);
+ let issue=findAfter([/EMISSIONE\s*\/\s*ISSUING/i,/\bISSUING\b/i],2);
+ let cit=findAfter([/CITTADINANZA\s*\/\s*NATIONALITY/i,/\bCITTADINANZA\b/i,/\bNATIONALITY\b/i]);
+ let sex=findAfter([/^SESSO\s*\/\s*SEX$/i,/\bSESSO\b.*\bSEX\b/i],2);
+
+ // Se il riconoscimento ha lasciato l'etichetta nella stessa riga, puliscila.
+ const removeLabel=(v,labels)=>{let x=String(v||"");for(const rx of labels)x=x.replace(rx,"");return stripCieValue(x)};
+ surname=removeLabel(surname,[/^COGNOME\s*\/\s*SURNAME\s*/i,/^COGNOME\s*/i,/^SURNAME\s*/i]);
+ given=removeLabel(given,[/^NOME\s*\/\s*NAME\s*/i,/^NOME\s*/i,/^NAME\s*/i]);
+ cit=removeLabel(cit,[/^CITTADINANZA\s*\/\s*NATIONALITY\s*/i,/^CITTADINANZA\s*/i,/^NATIONALITY\s*/i]);
+ issue=removeLabel(issue,[/^EMISSIONE\s*\/\s*ISSUING\s*/i,/^ISSUING\s*/i]);
+ sex=removeLabel(sex,[/^SESSO\s*\/\s*SEX\s*/i,/^SESSO\s*/i,/^SEX\s*/i]);
+
+ // Il luogo di nascita può essere seguito dalla data sulla stessa riga.
+ let birthDate=firstDate(birthBlock) || firstDate(full);
+ let birthPlace=birthBlock.replace(/\b\d{1,2}[\/.\-]\d{1,2}[\/.\-]\d{4}\b/g,'').trim();
+ // Se l'OCR ha saltato l'etichetta, prova a individuare la riga che contiene
+ // una data e usa il testo precedente come luogo di nascita.
+ if(!birthPlace){
+   for(const line of lines){
+     const m=line.match(/^(.+?)\s+(\d{1,2}[\/.\-]\d{1,2}[\/.\-]\d{4})$/);
+     if(m && !/SCADENZA|EXPIRY|EMISSIONE|ISSUING/i.test(line)){birthPlace=stripCieValue(m[1]);birthDate=firstDate(m[2]);break;}
+   }
+ }
+ // Documento: sulle CIE il numero è spesso in alto a destra e non è preceduto
+ // dalla parola "NUMERO". Recuperiamo un candidato alfanumerico solo se non è
+ // una sigla di campo o un codice paese.
+ let docNum="";
+ const candidates=[];
+ for(const line of lines){
+   const cleaned=stripCieValue(line).toUpperCase().replace(/\s+/g,"");
+   if(/^[A-Z]{1,3}\d{5,12}$/.test(cleaned) || /^[A-Z0-9]{9,14}$/.test(cleaned)) candidates.push(cleaned);
+ }
+ // Preferisci un candidato vicino all'inizio del documento, evitando ITA/IT.
+ docNum=candidates.find(x=>!/^ITA$/.test(x)&&!/^[A-Z]{1,3}$/.test(x))||"";
+
+ // Data di nascita: se la riga specifica non è stata riconosciuta, cerca una data
+ // prima di quella di scadenza. La CIE mostra anche la data di emissione.
+ if(!birthDate){
+   const dates=[...full.matchAll(/\b\d{1,2}[\/.\-]\d{1,2}[\/.\-]\d{4}\b/g)].map(m=>m[0]);
+   if(dates.length)birthDate=firstDate(dates[0]);
+ }
+ if(surname && !/^COGNOME|SURNAME$/i.test(surname))set("cognome",surname);
+ if(given && !/^NOME|NAME$/i.test(given))set("nome",given);
+ if(birthPlace && !/^LUOGO|PLACE$/i.test(birthPlace)){set("luogo_nascita",birthPlace);g.dataset.birthplaceManual="1";}
+ if(birthDate)set("nascita",birthDate);
+ if(cit){
+   // Normalizza il caso più frequente dell'OCR: ITA -> Italia.
+   const c=/^ITA(?:LIA)?$/i.test(cit.replace(/[^A-Z]/gi,""))?"Italia":cit;
+   set("cittadinanza",c);syncPlacesFromNationality(activeGuestIndex);
+ }
+ if(sex){const m=sex.toUpperCase().match(/\b([MF])\b/);if(m)set("sesso",m[1]);}
+ if(issue && !/^EMISSIONE|ISSUING$/i.test(issue)){set("luogo_rilascio_documento",issue);g.dataset.issuingPlaceManual="1";}
+ if(docNum)set("numero_documento",docNum);
+
+ show("cieOcrMsg","✓ Analisi completata. Ho migliorato il riconoscimento del fronte CIE; controlla comunque i campi prima di salvare.");
  if(cieStream){cieStream.getTracks().forEach(t=>t.stop());cieStream=null}
 }
 
