@@ -100,11 +100,34 @@ if(officialCountriesLoaded && officialCountries.length){if(field)field.value="";
 },300)}
 let officialGuestTypes=[];
 let officialDocumentTypes=[];
+const OFFICIAL_DOCUMENT_FALLBACK=[
+"CARTA DI IDENTITA'","CARTA ID. DIPLOMATICA","CARTA IDENTITA' ELETTRONICA","CERTIFICATO D'IDENTITA'",
+"PASSAPORTO DIPLOMATICO","PASSAPORTO DI SERVIZIO","PASSAPORTO ORDINARIO","PATENTE DI GUIDA","PATENTE NAUTICA",
+"PORTO D'ARMI GUARDIE GIUR","PORTO D'ARMI USO SPORTIVO","PORTO FUCILE DIF. PERSON.","PORTO FUCILE USO CACCIA","PORTO PISTOLA DIF. PERSON",
+"TES. ENTE NAZ. ASSIS.VOLO","TES. FERROV. EX DEPUTATI","TES. FERROVIARIA DEPUTATI","TES. POSTE E TELECOMUNIC.",
+"TES. UNICO PER LA CAMERA","TES.DOGANALE RIL.MIN.FIN.","TESS. AG. E AG.SC. C.F.S.","TESS. AGENTI/ASS.TI P.P.","TESS. AGENTI/ASS.TI P.S.",
+"TESS. APP.TO AG.CUSTODIA","TESS. APP.TO CARABINIERI","TESS. APP.TO FINANZIERE","TESS. APP.TO/VIG. URBANO","TESS. APP.TO/VIG. VV.FF.",
+"TESS. CONSIGLIO DI STATO","TESS. CORTE D'APPELLO","TESS. CORTE DEI CONTI","TESS. FERROV. SENATO","TESS. FUNZIONARI P.S.",
+"TESS. IDENTIF.TELECOM IT.","TESS. ISCR. ALBO MED/CHI.","TESS. ISCRIZ. ALBO ODONT.","TESS. ISPETTORI P.P.","TESS. ISPETTORI P.S.",
+"TESS. MEMBRO EQUIP. AEREO","TESS. MINISTERO INTERNO","TESS. MINISTERO GIUSTIZIA","TESS. MINISTERO DIFESA","TESS. MINISTERO FINANZE",
+"TESS. MINISTERO SANITA'","TESS. MINISTERO TESORO","TESS. MIN.PUBB.ISTRUZIONE","TESS. MINIST. TRASP/NAVIG.",
+"TESSERA DELL'ORDINE NOTAI","TESSERA RICONOSC. D.I.A.","TESSERA U.N.U.C.I.","TITOLO VIAGGIO RIF.POLIT."];
+
 async function loadOfficialGuestTypes(){
   try{const r=await api("/api/tipi-alloggiato");const j=await r.json();if(!j.ok)throw new Error(j.error||"Tabella Tipo Alloggiato non disponibile");officialGuestTypes=j.items||[];renderGuestTypeControls();}catch(e){officialGuestTypes=[];}
 }
 async function loadOfficialDocumentTypes(){
-  try{const r=await api("/api/tipi-documento");const j=await r.json();if(!j.ok)throw new Error(j.error||"Tabella Tipo Documento non disponibile");officialDocumentTypes=j.items||[];renderDocumentTypeControls();}catch(e){officialDocumentTypes=[];}
+  try{
+    const r=await api("/api/tipi-documento");
+    const j=await r.json();
+    if(!j.ok)throw new Error(j.error||"Tabella Tipo Documento non disponibile");
+    officialDocumentTypes=Array.isArray(j.items)?j.items:[];
+  }catch(e){
+    // Il menu deve rimanere utilizzabile anche se il download ufficiale non è momentaneamente disponibile.
+    // I codici per la trasmissione vengono comunque risolti lato server contro la tabella Alloggiati Web.
+    officialDocumentTypes=OFFICIAL_DOCUMENT_FALLBACK.map(nome=>({codice:"",nome}));
+  }
+  renderDocumentTypeControls();
 }
 function internalGuestTypeFromName(name){
  const n=countryNorm(name);
@@ -174,13 +197,13 @@ ${first
  ? `<div><label>Tipologia Alloggiato</label><select data-f="tipologia" onchange="updateGuestType(0)"><option value="ospite_singolo">Ospite singolo</option><option value="capo_famiglia">Capo famiglia</option><option value="capo_gruppo">Capo gruppo</option><option value="familiare">Familiare</option><option value="membro_gruppo">Membro gruppo</option></select><input type="hidden" data-f="tipologia_code"></div>`
  : `<div><label>Tipologia Alloggiato</label><input data-f="tipologia" readonly value="ospite_singolo"><input type="hidden" data-f="tipologia_code"></div>`}
 <div><label>Cittadinanza</label><div class="field-wrap"><input data-f="cittadinanza" autocomplete="off" oninput="handleNationalityInput(${i-1})" onfocus="openNationalityList(${i-1})" onblur="handleNationalityBlur(${i-1})"><input type="hidden" data-f="cittadinanza_code"><div id="nationalitySuggestions_${i-1}" class="country-suggestions hidden"></div></div><div id="nationalityHint_${i-1}" class="municipality-hint">Seleziona uno Stato dall'elenco ufficiale Alloggiati Web.</div></div>
-<div><label>Luogo di nascita</label><div class="field-wrap"><input data-f="luogo_nascita" autocomplete="off" oninput="handlePlaceInput(${i-1},'birth')" onblur="handlePlaceBlur(${i-1},'birth')"><div id="birthSuggestions_${i-1}" class="municipality-suggestions hidden"></div></div><div id="birthHint_${i-1}" class="municipality-hint"></div></div>
+<div><label>Luogo di nascita</label><div class="field-wrap"><input data-f="luogo_nascita" autocomplete="off" oninput="handlePlaceInput(${i-1},'birth')" onfocus="handlePlaceFocus(${i-1},'birth')" onblur="handlePlaceBlur(${i-1},'birth')"><div id="birthSuggestions_${i-1}" class="municipality-suggestions hidden"></div></div><div id="birthHint_${i-1}" class="municipality-hint"></div></div>
 <div><label>Cognome</label><input data-f="cognome"></div>
 <div><label>Nome</label><input data-f="nome"></div>
 <div><label>Data di nascita</label><input data-f="nascita" type="date"></div>
 <div><label>Sesso</label><select data-f="sesso"><option value="">Seleziona</option><option value="M">M</option><option value="F">F</option></select></div>
 ${first?`<div class="doc-field"><label>Tipologia documento</label><select data-f="tipo_documento"><option value="">Seleziona</option></select></div>
-<div class="doc-field"><label>Luogo di rilascio del documento</label><div class="field-wrap"><input data-f="luogo_rilascio_documento" autocomplete="off" oninput="handlePlaceInput(0,'issue')" onblur="handlePlaceBlur(0,'issue')"><div id="issueSuggestions_0" class="municipality-suggestions hidden"></div></div><div id="issueHint_0" class="municipality-hint"></div></div>
+<div class="doc-field"><label>Luogo di rilascio del documento</label><div class="field-wrap"><input data-f="luogo_rilascio_documento" autocomplete="off" oninput="handlePlaceInput(0,'issue')" onfocus="handlePlaceFocus(0,'issue')" onblur="handlePlaceBlur(0,'issue')"><div id="issueSuggestions_0" class="municipality-suggestions hidden"></div></div><div id="issueHint_0" class="municipality-hint"></div></div>
 <div class="doc-field"><label>Numero documento</label><input data-f="numero_documento"></div>`:`<input type="hidden" data-f="tipo_documento"><input type="hidden" data-f="luogo_rilascio_documento"><input type="hidden" data-f="numero_documento">`}
 </div>
 <button type="button" class="secondary" style="margin-top:12px" onclick="scanGuestMrz(${i-1})">📷 Leggi documento di Ospite ${i}</button>
@@ -246,8 +269,10 @@ function syncPlacesFromNationality(index){
    if(placeHint(index,'birth'))placeHint(index,'birth').textContent="Cerca e seleziona il Comune italiano.";
    if(placeHint(index,'issue'))placeHint(index,'issue').textContent="Cerca e seleziona il Comune italiano.";
  }else{
-   if(b&&g.dataset.birthplaceManual!=="1"){b.value=c;g.dataset.birthplaceAutoValue=c;}
-   if(i&&g.dataset.issuingPlaceManual!=="1"){i.value=c;g.dataset.issuingPlaceAutoValue=c;}
+   const countryItem=availableCountries().find(x=>countryNorm(x.nome)===countryNorm(c));
+   const countryCode=countryItem?.codice||cc||"";
+   if(b&&g.dataset.birthplaceManual!=="1"){b.value=countryItem?.nome||c;g.dataset.birthplaceAutoValue=countryItem?.nome||c;g.dataset.birthStateCode=countryCode;}
+   if(i&&g.dataset.issuingPlaceManual!=="1"){i.value=countryItem?.nome||c;g.dataset.issuingPlaceAutoValue=countryItem?.nome||c;g.dataset.issuingStateCode=countryCode;}
    if(placeHint(index,'birth'))placeHint(index,'birth').textContent="Per cittadini stranieri viene indicato il Paese.";
    if(placeHint(index,'issue'))placeHint(index,'issue').textContent="Per cittadini stranieri viene indicato il Paese.";
    clearPlaceSuggestions(index,'birth');clearPlaceSuggestions(index,'issue');
@@ -272,14 +297,42 @@ async function searchMunicipalities(index,kind){
  },180);
 }
 function escapeHtml(v){return String(v??"").replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/\"/g,"&quot;").replace(/'/g,"&#39;")}
-function handlePlaceInput(index,kind){
+function renderPlaceCountrySuggestions(index,kind,query=""){
+ const box=placeSuggestionBox(index,kind);if(!box)return;
+ const q=countryNorm(query);
+ const items=availableCountries().filter(x=>!q||countryNorm(x.nome).includes(q)).slice(0,80);
+ box.innerHTML=items.map(x=>`<button type="button" data-name="${escapeHtml(x.nome)}" data-code="${escapeHtml(x.codice||"")}" onpointerdown="selectPlaceCountry(${index},'${kind}',this);return false;">${escapeHtml(x.nome)}</button>`).join("");
+ box.classList.toggle("hidden",items.length===0);
+}
+function selectPlaceCountry(index,kind,button){
+ const g=getGuest(index);if(!g)return;
+ const field=placeField(index,kind);if(!field)return;
+ const name=button.dataset.name||"", code=button.dataset.code||"";
+ field.value=name;field.dataset.countrySelected="1";field.dataset.countryCode=code;
+ field.dataset.municipalitySelected="0";field.dataset.municipalityCode="";field.dataset.municipalityProvince="";
+ if(kind==='birth'){g.dataset.birthplaceManual="1";g.dataset.birthplaceAutoValue="";g.dataset.birthStateCode=code;g.dataset.birthProvince="";}
+ else{g.dataset.issuingPlaceManual="1";g.dataset.issuingPlaceAutoValue="";g.dataset.issuingStateCode=code;}
+ clearPlaceSuggestions(index,kind);
+ const h=placeHint(index,kind);if(h)h.textContent=`Selezionato: ${name}${code?` — codice Alloggiati ${code}`:''}`;
+}
+function handlePlaceFocus(index,kind){
  const g=getGuest(index);if(!g)return;
  const c=g.querySelector('[data-f="cittadinanza"]')?.value?.trim();
  if(!isItalianNationality(c)){
-   if(kind==='birth')markBirthplaceManual(index);else markIssuingPlaceManual(index);
-   clearPlaceSuggestions(index,kind);return;
+   renderPlaceCountrySuggestions(index,kind,(placeField(index,kind)?.value||"")===String(g.dataset.birthplaceAutoValue||g.dataset.issuingPlaceAutoValue||"")?"":(placeField(index,kind)?.value||""));
  }
- const field=placeField(index,kind);if(field){field.dataset.municipalitySelected="0";field.dataset.municipalityCode="";field.dataset.municipalityProvince="";}
+}
+function handlePlaceInput(index,kind){
+ const g=getGuest(index);if(!g)return;
+ const c=g.querySelector('[data-f="cittadinanza"]')?.value?.trim();
+ const field=placeField(index,kind);if(!field)return;
+ if(!isItalianNationality(c)){
+   field.dataset.countrySelected="0";field.dataset.countryCode="";
+   if(kind==='birth')markBirthplaceManual(index);else markIssuingPlaceManual(index);
+   renderPlaceCountrySuggestions(index,kind,field.value||"");
+   return;
+ }
+ field.dataset.municipalitySelected="0";field.dataset.municipalityCode="";field.dataset.municipalityProvince="";
  if(kind==='birth')markBirthplaceManual(index);else markIssuingPlaceManual(index);
  searchMunicipalities(index,kind);
 }
@@ -294,12 +347,24 @@ function selectMunicipality(index,kind,button){
  const h=placeHint(index,kind);if(h)h.textContent=`Selezionato: ${name}${button.dataset.prov?` (${button.dataset.prov})`:''}`;
 }
 function handlePlaceBlur(index,kind){
- setTimeout(()=>{
-   clearPlaceSuggestions(index,kind);
+ setTimeout(async()=>{
    const g=getGuest(index);if(!g)return;
    const c=g.querySelector('[data-f="cittadinanza"]')?.value?.trim();
-   if(!isItalianNationality(c))return;
    const field=placeField(index,kind);if(!field)return;
+   if(!isItalianNationality(c)){
+     clearPlaceSuggestions(index,kind);
+     if(field.dataset.countrySelected==="1")return;
+     const typed=countryNorm(field.value||"");
+     if(!typed){return;}
+     await loadOfficialCountries();
+     const exact=availableCountries().find(x=>countryNorm(x.nome)===typed);
+     if(exact){selectPlaceCountry(index,kind,{dataset:{name:exact.nome,code:exact.codice||""}});return;}
+     // Evita di salvare testo libero che Alloggiati Web non riconoscerà.
+     field.value="";
+     const h=placeHint(index,kind);if(h)h.textContent="Seleziona uno Stato dall'elenco ufficiale Alloggiati Web.";
+     return;
+   }
+   clearPlaceSuggestions(index,kind);
    if(field.value.trim() && field.dataset.municipalitySelected!=="1"){
      field.value="";
      if(kind==='birth')g.dataset.birthProvince="";
@@ -311,6 +376,8 @@ function collectGuests(){
  return [...document.querySelectorAll(".guest")].map(g=>{
    const o=Object.fromEntries([...g.querySelectorAll("[data-f]")].map(x=>[x.dataset.f,x.value]));
    if(o.cittadinanza_code) o.cittadinanza_code=String(o.cittadinanza_code).trim();
+   if(g.dataset.birthStateCode) o.stato_nascita_code=String(g.dataset.birthStateCode).trim();
+   if(g.dataset.issuingStateCode) o.stato_documento_code=String(g.dataset.issuingStateCode).trim();
    if(o.cittadinanza && isItalianNationality(o.cittadinanza)){
      o.provincia_nascita=String(g.dataset.birthProvince||g.querySelector('[data-f="luogo_nascita"]')?.dataset.municipalityProvince||"").toUpperCase();
    }
