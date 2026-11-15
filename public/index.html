@@ -427,11 +427,195 @@ function scanGuestMrz(index){
  startMrzScanner();
 }
 
+function mrzRawLines(raw){
+ let s=String(raw||"").replace(/\r/g,"\n");
+ // Remove diagnostic text that web-mrz-reader can append after the MRZ.
+ s=s.split(/\n\nWarning:/i)[0];
+ const lines=s.split(/\n+/).map(x=>x.trim()).filter(Boolean);
+ return lines;
+}
+
+function normalizeMrzGlyphs(v){
+ return String(v||"")
+   .toUpperCase()
+   .replace(/[‹›«»﹤﹥＜＞≤≥≪≫]/g,"<")
+   .replace(/[–—−]/g,"-");
+}
+
+function repairMrzSeparators(raw){
+ const lines=mrzRawLines(raw);
+ if(!lines.length)return "";
+ const cleaned=lines.map(normalizeMrzGlyphs);
+ // MRZ engines/OCR sometimes return visually similar glyphs or ordinary spaces
+ // instead of the ICAO filler character '<'. For the fixed-width name field,
+ // spaces are safe to repair because the ICAO MRZ itself never contains spaces.
+ if(cleaned.length===2 && cleaned[0].length>=44){
+   const name=cleaned[0].slice(5,44).replace(/\s+/g,"<");
+   cleaned[0]=cleaned[0].slice(0,5)+name;
+ }else if(cleaned.length===2 && cleaned[0].length>=36){
+   const name=cleaned[0].slice(5,36).replace(/\s+/g,"<");
+   cleaned[0]=cleaned[0].slice(0,5)+name;
+ }else if(cleaned.length>=3 && cleaned[2].length>=20){
+   cleaned[2]=cleaned[2].replace(/\s+/g,"<");
+ }
+ return cleaned.join("\n");
+}
+
+function extractMrzCandidates(raw){
+ const original=mrzRawLines(raw).map(normalizeMrzGlyphs);
+ const repaired=repairMrzSeparators(raw).split(/\n+/).filter(Boolean);
+ const all=[...original,...repaired].filter(Boolean);
+ const unique=[];
+ for(const line of all){
+   const compact=line.replace(/\s+/g,"");
+   if(compact.length>=25 && !unique.includes(line))unique.push(line);
+ }
+ return unique;
+}
+
+function parseIcaoNameField(nameField){
+ let f=normalizeMrzGlyphs(nameField);
+ // Keep a copy with OCR whitespace: if the OCR lost one/both '<' characters,
+ // a run of two or more spaces can still reveal the ICAO surname/name boundary.
+ const spaced=f.replace(/[=]/g,"<");
+ f=f.replace(/\s+/g,"<");
+ const sep=f.indexOf("<<");
+ if(sep>=0){
+   const surname=f.slice(0,sep).replace(/<+/g," ").trim();
+   const given=f.slice(sep+2).replace(/<+/g," ").trim();
+   if(surname&&given)return {surname,given,confidence:"icao"};
+ }
+ const spaceBoundary=spaced.match(/\s{2,}/);
+ if(spaceBoundary && spaceBoundary.index!=null){
+   const surname=spaced.slice(0,spaceBoundary.index).replace(/[<]+/g," ").trim();
+   const given=spaced.slice(spaceBoundary.index+spaceBoundary[0].length).replace(/[<]+/g," ").trim();
+   if(surname&&given)return {surname,given,confidence:"ocr-space-boundary"};
+ }
+ return null;
+}
+
+
+function icaoCheckDigit(field){
+ const weights=[7,3,1];
+ let sum=0;
+ for(let i=0;i<String(field||"").length;i++){
+   const c=String(field[i]).toUpperCase();
+   let v=0;
+   if(/[0-9]/.test(c))v=Number(c);
+   else if(/[A-Z]/.test(c))v=c.charCodeAt(0)-55;
+   else if(c==="<")v=0;
+   else return null;
+   sum+=v*weights[i%3];
+ }
+ return sum%10;
+}
+function icaoFieldCheck(field,check){
+ const d=icaoCheckDigit(field);
+ return d!=null && String(check||"")===String(d);
+}
+
+function parseIcaoMrz(raw){
+ const lines=extractMrzCandidates(raw);
+ // TD3 passport: line 1 contains the ICAO name field at positions 6-44.
+ // We can safely extract surname/given names even if the OCR returned only
+ // the first MRZ line; the second line is needed only for the fixed data fields.
+ let l1=lines.find(x=>/^P</.test(x)&&x.replace(/\s+/g,"").length>=30);
+ let l2=l1?lines.find(x=>x!==l1&&x.replace(/\s+/g,"").length>=36):null;
+ if(l1){
+   const compact1=l1.replace(/\s+/g,"");
+   // A passport TD3 normally has 44 chars. OCR can occasionally lose one or
+   // more trailing filler characters, so lengths in the low 40s are still
+   // treated as TD3 and the available name field is parsed as-is.
+   const isTd3=l1.length>=44 || compact1.length>=40;
+   const nameSource=normalizeMrzGlyphs(l1);
+   const nameField=nameSource.slice(5,isTd3?Math.min(44,nameSource.length):36);
+   const names=parseIcaoNameField(nameField);
+   if(names){
+     if(l2 && isTd3){
+       l1=compact1.padEnd(44,"<").slice(0,44);
+       l2=l2.replace(/\s+/g,"").padEnd(44,"<").slice(0,44);
+       const docField=l2.slice(0,9);
+       const birthField=l2.slice(13,19);
+       const expiryField=l2.slice(21,27);
+       return {format:"TD3",lines:[l1,l2],name:names,documentNumber:docField.replace(/<+/g,""),nationality:l2.slice(10,13).replace(/<+/g,""),birthDate:birthField,gender:l2.slice(20,21),expiryDate:expiryField,issuingCountry:l1.slice(2,5).replace(/<+/g,""),checks:{document:icaoFieldCheck(docField,l2[9]),birth:icaoFieldCheck(birthField,l2[19]),expiry:icaoFieldCheck(expiryField,l2[27])}};
+     }
+     return {format:isTd3?"TD3":"TD2",lines:[compact1],name:names,issuingCountry:compact1.slice(2,5).replace(/<+/g,"")};
+   }
+ }
+ return null;
+}
+
+function parsePassportMrzNames(raw){
+ const parsed=parseIcaoMrz(raw);
+ if(parsed?.name?.surname&&parsed?.name?.given){
+   return {surname:parsed.name.surname,given:parsed.name.given};
+ }
+ // Conservative fallback for a partially recognized passport line.
+ const lines=mrzRawLines(repairMrzSeparators(raw)).map(x=>x.replace(/\s+$/g,""));
+ const line1=lines.find(x=>/^P</i.test(x));
+ if(!line1) return null;
+ let nameField=line1.length>=44 ? line1.slice(5,44) : line1.slice(5,36);
+ nameField=normalizeMrzGlyphs(nameField).replace(/\s+/g,"<");
+ const sep=nameField.indexOf("<<");
+ if(sep<0)return null;
+ const surname=nameField.slice(0,sep).replace(/<+/g," ").trim();
+ const given=nameField.slice(sep+2).replace(/<+/g," ").trim();
+ if(!surname||!given)return null;
+ return {surname,given};
+}
+
+function mrzParsedScore(p){
+ if(!p||typeof p!=="object")return -1;
+ let score=0;
+ const v=p.Validation;
+ if(v?.isValid===true)score+=1000;
+ for(const k of ["Surname","Given Names","Document Number","Nationality","Issuing Country","Date of Birth","Gender"]) if(String(p[k]||"").trim())score+=10;
+ const sn=String(p.Surname||"").trim(),gn=String(p["Given Names"]||"").trim();
+ if(sn)score+=Math.min(20,sn.length);
+ if(gn)score+=Math.min(20,gn.length);
+ return score;
+}
 async function applyMrzResult(result){
  await loadOfficialCountries();
- const p=result?.parsed;
+ let p=result?.parsed;
  if(!p || typeof p!=="object") return false;
+ // Keep the library as the primary MRZ engine, but add a conservative repair pass
+ // for OCR substitutions of '<' in the name field. Re-parse only when the repaired
+ // text produces an equal or better structured result.
+ try{
+   const raw=repairMrzSeparators(result?.raw);
+   if(raw){
+     const mod=await loadMrzLibrary();
+     if(typeof mod.parseMrz==="function"){
+       const repaired=mod.parseMrz(raw);
+       if(mrzParsedScore(repaired)>=mrzParsedScore(p))p=repaired;
+     }
+   }
+ }catch(e){}
  const g=getGuest(activeGuestIndex); if(!g) return false;
+ // For passports, use the ICAO name separators as the authoritative fallback.
+ // This fixes OCR cases where the MRZ library reads the surname/given-name
+ // boundary incorrectly even though the raw MRZ contains the correct << marker.
+ const nameFallback=parsePassportMrzNames(result?.raw);
+ const icao=parseIcaoMrz(result?.raw);
+ if(nameFallback){
+   p={...p,Surname:nameFallback.surname,"Given Names":nameFallback.given};
+ }
+ // When the raw MRZ is structurally recognizable, use the ICAO fixed-position
+ // fields as an additional source of truth. The library remains responsible
+ // for validation, while ICAO parsing repairs OCR mistakes in separators and
+ // field boundaries.
+ if(icao){
+   p={...p,
+     ...(icao.name?.surname?{Surname:icao.name.surname}:{}),
+     ...(icao.name?.given?{"Given Names":icao.name.given}:{}),
+     ...(icao.documentNumber && (icao.checks?.document!==false)?{"Passport Number":icao.documentNumber,"Document Number":icao.documentNumber}:{}),
+     ...(icao.nationality?{Nationality:icao.nationality}:{}),
+     ...(icao.birthDate && (icao.checks?.birth!==false)?{"Date of Birth":icao.birthDate}:{}),
+     ...(icao.gender?{Gender:icao.gender}:{}),
+     ...(icao.issuingCountry?{"Issuing Country":icao.issuingCountry}:{})
+   };
+ }
  const get=(...keys)=>{for(const k of keys){if(p[k]!=null&&String(p[k]).trim()!=="")return String(p[k]).trim()}return ""};
  const sex=get("Gender");
  const nationality=countryName(get("Nationality"));
