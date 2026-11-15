@@ -592,8 +592,10 @@ function mrzParsedScore(p){
 }
 async function applyMrzResult(result){
  await loadOfficialCountries();
- let p=result?.parsed;
- if(!p || typeof p!=="object") return false;
+ // The external MRZ library may fail to return a parsed object even when its
+ // OCR result contains a perfectly recognizable ICAO MRZ. Do NOT stop here: the
+ // raw two-line MRZ is the source used by our own ICAO parser.
+ let p=(result?.parsed && typeof result.parsed==="object") ? result.parsed : {};
  // Keep the library as the primary MRZ engine, but add a conservative repair pass
  // for OCR substitutions of '<' in the name field. Re-parse only when the repaired
  // text produces an equal or better structured result.
@@ -655,7 +657,10 @@ async function applyMrzResult(result){
    syncPlacesFromNationality(activeGuestIndex);
  }
  const validation=p.Validation;
- return validation?.isValid===true;
+ // A structurally parsed ICAO MRZ is useful even when the third-party library
+ // did not produce its own validation object (or one check digit failed because
+ // of a single OCR character). The fields are already populated above.
+ return validation?.isValid===true || !!icao;
 }
 
 async function loadMrzLibrary(){
