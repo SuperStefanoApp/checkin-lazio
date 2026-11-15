@@ -316,8 +316,24 @@ function selectPlaceCountry(index,kind,button){
  const g=getGuest(index);if(!g)return;
  const field=placeField(index,kind);if(!field)return;
  const name=button.dataset.name||"", code=button.dataset.code||"";
- field.value=name;field.dataset.countrySelected="1";field.dataset.countryCode=code;
+ const italian=countryNorm(name)==="ITALIA" || String(code)==="100000100";
+ field.dataset.countrySelected="1";field.dataset.countryCode=code;
  field.dataset.municipalitySelected="0";field.dataset.municipalityCode="";field.dataset.municipalityProvince="";
+ if(italian){
+   // Per l'Italia Alloggiati Web non accetta lo Stato come luogo di nascita/rilascio:
+   // deve essere indicato il Comune. Dopo aver selezionato ITALIA, svuotiamo il campo
+   // e lo trasformiamo immediatamente nella ricerca del Comune.
+   field.value="";
+   field.dataset.countrySelected="0";
+   field.dataset.countryCode=code;
+   if(kind==='birth'){g.dataset.birthplaceManual="1";g.dataset.birthplaceAutoValue="";g.dataset.birthStateCode=code;g.dataset.birthProvince="";}
+   else{g.dataset.issuingPlaceManual="1";g.dataset.issuingPlaceAutoValue="";g.dataset.issuingStateCode=code;}
+   clearPlaceSuggestions(index,kind);
+   const h=placeHint(index,kind);if(h)h.textContent="Italia selezionata: inserisci e seleziona il Comune dall'elenco Alloggiati Web.";
+   setTimeout(()=>{try{field.focus()}catch(e){}},0);
+   return;
+ }
+ field.value=name;
  if(kind==='birth'){g.dataset.birthplaceManual="1";g.dataset.birthplaceAutoValue="";g.dataset.birthStateCode=code;g.dataset.birthProvince="";}
  else{g.dataset.issuingPlaceManual="1";g.dataset.issuingPlaceAutoValue="";g.dataset.issuingStateCode=code;}
  clearPlaceSuggestions(index,kind);
