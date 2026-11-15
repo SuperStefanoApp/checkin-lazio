@@ -8,7 +8,7 @@
 <title>CheckIn Lazio</title>
 <style>
 :root{font-family:system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;color:#163047;background:#f4f7fa}
-*{box-sizing:border-box}body{margin:0}.top{background:#123b5d;color:#fff;padding:18px 20px;position:sticky;top:0;z-index:5}.top h1{margin:0;font-size:22px}.wrap{max-width:900px;margin:0 auto;padding:18px}.card{background:#fff;border-radius:16px;padding:18px;margin-bottom:16px;box-shadow:0 2px 12px #00000012}.grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px}@media(max-width:650px){.grid{grid-template-columns:1fr}}label{font-weight:600;font-size:13px;display:block;margin-bottom:6px}input,button,select{width:100%;padding:12px;border:1px solid #ccd6df;border-radius:10px;font-size:16px}input[readonly]{background:#f2f5f7}button{background:#123b5d;color:#fff;border:0;font-weight:700;cursor:pointer}.secondary{background:#e9eef3;color:#123b5d}.danger{background:#a62929}.guest{border:1px solid #dce4eb;border-radius:12px;padding:14px;margin:12px 0}.row{display:flex;gap:10px;align-items:center}.row>*{flex:1}.status{padding:10px;border-radius:10px;background:#eef5fa;margin-top:12px}.small{font-size:12px;color:#617487}.hidden{display:none}.pill{display:inline-block;padding:5px 9px;border-radius:999px;background:#e9eef3;font-size:12px}.field-wrap{position:relative}.municipality-suggestions{position:absolute;left:0;right:0;top:100%;z-index:20;background:#fff;border:1px solid #ccd6df;border-radius:10px;box-shadow:0 8px 24px #00000018;overflow:hidden}.municipality-suggestions button{display:block;width:100%;text-align:left;background:#fff;color:#163047;border:0;border-radius:0;padding:10px 12px;font-weight:500}.municipality-suggestions button:hover{background:#eef5fa}.municipality-hint{font-size:11px;color:#617487;margin-top:4px}.country-suggestions{position:absolute;left:0;right:0;top:100%;z-index:30;background:#fff;border:1px solid #ccd6df;border-radius:10px;box-shadow:0 8px 24px #00000018;overflow:auto;max-height:280px}.country-suggestions button{display:block;width:100%;text-align:left;background:#fff;color:#163047;border:0;border-radius:0;padding:10px 12px;font-weight:500}.country-suggestions button:hover{background:#eef5fa}
+*{box-sizing:border-box}body{margin:0}.top{background:#123b5d;color:#fff;padding:18px 20px;position:sticky;top:0;z-index:5}.top h1{margin:0;font-size:22px}.wrap{max-width:900px;margin:0 auto;padding:18px}.card{background:#fff;border-radius:16px;padding:18px;margin-bottom:16px;box-shadow:0 2px 12px #00000012}.grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px}@media(max-width:650px){.grid{grid-template-columns:1fr}}label{font-weight:600;font-size:13px;display:block;margin-bottom:6px}input,button,select{width:100%;padding:12px;border:1px solid #ccd6df;border-radius:10px;font-size:16px}input[readonly]{background:#f2f5f7}button{background:#123b5d;color:#fff;border:0;font-weight:700;cursor:pointer}.secondary{background:#e9eef3;color:#123b5d}.danger{background:#a62929}.guest{border:1px solid #dce4eb;border-radius:12px;padding:14px;margin:12px 0}.row{display:flex;gap:10px;align-items:center}.row>*{flex:1}.status{padding:10px;border-radius:10px;background:#eef5fa;margin-top:12px}.small{font-size:12px;color:#617487}.hidden{display:none}.pill{display:inline-block;padding:5px 9px;border-radius:999px;background:#e9eef3;font-size:12px}.field-wrap{position:relative}.municipality-suggestions{position:absolute;left:0;right:0;top:100%;z-index:20;background:#fff;border:1px solid #ccd6df;border-radius:10px;box-shadow:0 8px 24px #00000018;overflow:hidden}.municipality-suggestions button{display:block;width:100%;text-align:left;background:#fff;color:#163047;border:0;border-radius:0;padding:10px 12px;font-weight:500}.municipality-suggestions button:hover{background:#eef5fa}.municipality-hint{font-size:11px;color:#617487;margin-top:4px}.country-suggestions{position:absolute;left:0;right:0;top:100%;z-index:30;background:#fff;border:1px solid #ccd6df;border-radius:10px;box-shadow:0 8px 24px #00000018;overflow:auto;max-height:280px}.country-suggestions button{display:block;width:100%;text-align:left;background:#fff;color:#163047;border:0;border-radius:0;padding:10px 12px;font-weight:500}.country-suggestions button:hover{background:#eef5fa}.country-suggestions button:active{background:#dfeaf2}
 #mrzPanel{position:fixed;inset:0;background:#f4f7fa;z-index:1000;display:flex;flex-direction:column;overflow:auto}#mrzPanel.hidden{display:none}.scan-top{background:#123b5d;color:#fff;padding:16px 18px;display:flex;align-items:center;gap:12px;position:sticky;top:0;z-index:2}.scan-top h2{margin:0;font-size:19px;flex:1}.scan-close{width:auto;padding:10px 14px;background:#fff;color:#123b5d}.scan-body{width:100%;max-width:900px;margin:0 auto;padding:16px}.scan-status{margin:0 0 12px}.scan-actions{display:flex;gap:10px;margin-top:12px}.scan-actions button{flex:1}.scan-note{background:#eef5fa;padding:12px;border-radius:10px;margin-top:10px;font-size:13px;color:#40566a}.scan-note strong{color:#123b5d}#mrz-reader{width:100%;max-width:888px;margin:0 auto;border-radius:14px;overflow:hidden;background:#0b1116;min-height:300px}
 .cie-camera{position:relative;width:100%;max-width:900px;margin:0 auto;background:#000;border-radius:14px;overflow:hidden}.cie-camera video{display:block;width:100%;max-height:60vh;object-fit:cover}.cie-guide{position:absolute;left:4%;top:50%;width:92%;aspect-ratio:85.6/54;transform:translateY(-50%);border:3px dashed #43e67b;border-radius:12px;box-shadow:0 0 0 9999px rgba(0,0,0,.28);pointer-events:none}.cie-guide-label{position:absolute;left:0;right:0;top:-34px;text-align:center;color:#fff;font-weight:700;font-size:13px;text-shadow:0 1px 3px #000}.cie-guide-hint{font-size:12px;color:#617487;margin-top:7px}.result-box{margin-top:12px;padding:12px;border-radius:10px;background:#eef8ef;border:1px solid #cde7d0}.warning-box{margin-top:12px;padding:12px;border-radius:10px;background:#fff6e8;border:1px solid #f0d7a8}
 </style>
@@ -86,13 +86,66 @@ async function loadOfficialCountries(){
 }
 function countryNorm(v){return String(v||"").normalize("NFD").replace(/[\u0300-\u036f]/g,"").toUpperCase().replace(/[^A-Z0-9]+/g," ").trim()}
 function countrySuggestionBox(index){return document.getElementById(`nationalitySuggestions_${index}`)}
+function fallbackCountries(){return Object.entries(COUNTRY_NAMES).map(([iso,nome])=>({codice:"",nome})).sort((a,b)=>a.nome.localeCompare(b.nome,"it"))}
+function availableCountries(){return officialCountries.length?officialCountries:fallbackCountries()}
 function clearNationalitySuggestions(index){const b=countrySuggestionBox(index);if(b){b.innerHTML="";b.classList.add("hidden")}}
-function renderNationalitySuggestions(index,query=""){const g=getGuest(index);if(!g)return;const b=countrySuggestionBox(index);if(!b)return;const q=countryNorm(query);const items=officialCountries.filter(x=>!q||countryNorm(x.nome).includes(q)).slice(0,80);b.innerHTML=items.map(x=>`<button type="button" data-name="${escapeHtml(x.nome)}" data-code="${escapeHtml(x.codice)}" onclick="selectNationality(${index},this)">${escapeHtml(x.nome)}</button>`).join("");b.classList.toggle("hidden",items.length===0)}
-async function openNationalityList(index){await loadOfficialCountries();renderNationalitySuggestions(index,getGuest(index)?.querySelector('[data-f="cittadinanza"]')?.value||"")}
-async function handleNationalityInput(index){const g=getGuest(index);if(!g)return;const field=g.querySelector('[data-f="cittadinanza"]'),code=g.querySelector('[data-f="cittadinanza_code"]');if(code)code.value="";if(field){field.dataset.countrySelected="0";field.dataset.countryCode=""}clearTimeout(nationalityTimers[index]);nationalityTimers[index]=setTimeout(async()=>{await loadOfficialCountries();renderNationalitySuggestions(index,field?.value||"")},100)}
-function selectNationality(index,button){const g=getGuest(index);if(!g)return;const field=g.querySelector('[data-f="cittadinanza"]'),code=g.querySelector('[data-f="cittadinanza_code"]');const name=button.dataset.name||"",cc=button.dataset.code||"";if(field){field.value=name;field.dataset.countrySelected="1";field.dataset.countryCode=cc}if(code)code.value=cc;const h=document.getElementById(`nationalityHint_${index}`);if(h)h.textContent=`Selezionato: ${name} — codice Alloggiati ${cc}`;clearNationalitySuggestions(index);syncPlacesFromNationality(index)}
-async function handleNationalityBlur(index){setTimeout(async()=>{const g=getGuest(index);if(!g)return;const field=g.querySelector('[data-f="cittadinanza"]'),code=g.querySelector('[data-f="cittadinanza_code"]');if(field?.dataset.countrySelected==="1")return;const typed=countryNorm(field?.value||"");if(!typed){clearNationalitySuggestions(index);return}await loadOfficialCountries();const exact=officialCountries.find(x=>countryNorm(x.nome)===typed);if(exact){selectNationality(index,{dataset:{name:exact.nome,code:exact.codice}});return}if(field)field.value="";if(code)code.value="";const h=document.getElementById(`nationalityHint_${index}`);if(h)h.textContent="Seleziona uno Stato dall'elenco ufficiale Alloggiati Web.";clearNationalitySuggestions(index);syncPlacesFromNationality(index)},180)}
-async function login(){const r=await fetch("/api/login",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({username:user.value,password:pass.value})});const j=await r.json();if(j.ok){token=j.token;localStorage.setItem("checkin_token",token);document.getElementById("login").classList.add("hidden");document.getElementById("app").classList.remove("hidden");syncGuests();setDepartureFromNights();loadOfficialCountries().catch(()=>{})}else show("loginMsg",j.error||"Accesso negato")}
+function renderNationalitySuggestions(index,query=""){const g=getGuest(index);if(!g)return;const b=countrySuggestionBox(index);if(!b)return;const q=countryNorm(query);const items=availableCountries().filter(x=>!q||countryNorm(x.nome).includes(q)).slice(0,80);b.innerHTML=items.map(x=>`<button type="button" data-name="${escapeHtml(x.nome)}" data-code="${escapeHtml(x.codice||"")}" onpointerdown="selectNationality(${index},this);return false;">${escapeHtml(x.nome)}</button>`).join("");b.classList.toggle("hidden",items.length===0)}
+async function openNationalityList(index){renderNationalitySuggestions(index,getGuest(index)?.querySelector('[data-f="cittadinanza"]')?.value||"");loadOfficialCountries().then(()=>renderNationalitySuggestions(index,getGuest(index)?.querySelector('[data-f="cittadinanza"]')?.value||""))}
+async function handleNationalityInput(index){const g=getGuest(index);if(!g)return;const field=g.querySelector('[data-f="cittadinanza"]'),code=g.querySelector('[data-f="cittadinanza_code"]');if(code)code.value="";if(field){field.dataset.countrySelected="0";field.dataset.countryCode=""}clearTimeout(nationalityTimers[index]);renderNationalitySuggestions(index,field?.value||"");nationalityTimers[index]=setTimeout(async()=>{await loadOfficialCountries();renderNationalitySuggestions(index,field?.value||"")},150)}
+function selectNationality(index,button){const g=getGuest(index);if(!g)return;const field=g.querySelector('[data-f="cittadinanza"]'),code=g.querySelector('[data-f="cittadinanza_code"]');const name=button.dataset.name||"",cc=button.dataset.code||"";if(field){field.value=name;field.dataset.countrySelected="1";field.dataset.countryCode=cc}if(code)code.value=cc;const h=document.getElementById(`nationalityHint_${index}`);if(h)h.textContent=cc?`Selezionato: ${name} — codice Alloggiati ${cc}`:`Selezionato: ${name}`;clearNationalitySuggestions(index);syncPlacesFromNationality(index)}
+async function handleNationalityBlur(index){setTimeout(async()=>{const g=getGuest(index);if(!g)return;const field=g.querySelector('[data-f="cittadinanza"]'),code=g.querySelector('[data-f="cittadinanza_code"]');if(field?.dataset.countrySelected==="1")return;const typed=countryNorm(field?.value||"");if(!typed){clearNationalitySuggestions(index);return}await loadOfficialCountries();const exact=availableCountries().find(x=>countryNorm(x.nome)===typed);if(exact){selectNationality(index,{dataset:{name:exact.nome,code:exact.codice||""}});return}
+// Non cancelliamo ciò che l'utente ha digitato se il servizio ufficiale non è temporaneamente disponibile.
+// In questo caso il dato verrà risolto dal server al momento della trasmissione.
+if(officialCountriesLoaded && officialCountries.length){if(field)field.value="";if(code)code.value="";const h=document.getElementById(`nationalityHint_${index}`);if(h)h.textContent="Seleziona uno Stato dall'elenco ufficiale Alloggiati Web.";clearNationalitySuggestions(index);}
+},300)}
+let officialGuestTypes=[];
+let officialDocumentTypes=[];
+async function loadOfficialGuestTypes(){
+  try{const r=await api("/api/tipi-alloggiato");const j=await r.json();if(!j.ok)throw new Error(j.error||"Tabella Tipo Alloggiato non disponibile");officialGuestTypes=j.items||[];renderGuestTypeControls();}catch(e){officialGuestTypes=[];}
+}
+async function loadOfficialDocumentTypes(){
+  try{const r=await api("/api/tipi-documento");const j=await r.json();if(!j.ok)throw new Error(j.error||"Tabella Tipo Documento non disponibile");officialDocumentTypes=j.items||[];renderDocumentTypeControls();}catch(e){officialDocumentTypes=[];}
+}
+function internalGuestTypeFromName(name){
+ const n=countryNorm(name);
+ if(n.includes("CAPO FAMIGLIA"))return "capo_famiglia";
+ if(n.includes("CAPO GRUPPO"))return "capo_gruppo";
+ if(n.includes("FAMILIARE"))return "familiare";
+ if(n.includes("MEMBRO GRUPPO")||n.includes("MEMBRO DI GRUPPO"))return "membro_gruppo";
+ if(n.includes("OSPITE SINGOLO"))return "ospite_singolo";
+ return "";
+}
+function officialGuestTypeCode(internal){
+ const x=officialGuestTypes.find(x=>internalGuestTypeFromName(x.nome)===internal);
+ return x?.codice||"";
+}
+function renderGuestTypeControls(){
+ document.querySelectorAll('.guest').forEach((g,i)=>{
+   const sel=g.querySelector('[data-f="tipologia"]');
+   const hidden=g.querySelector('[data-f="tipologia_code"]');
+   if(i===0 && sel && officialGuestTypes.length){
+     const current=sel.value||"ospite_singolo";
+     sel.innerHTML=officialGuestTypes.map(x=>`<option value="${escapeHtml(internalGuestTypeFromName(x.nome))}" data-code="${escapeHtml(x.codice)}">${escapeHtml(x.nome)}</option>`).filter(x=>!x.includes('value=""')).join("");
+     sel.value=officialGuestTypes.some(x=>internalGuestTypeFromName(x.nome)===current)?current:officialGuestTypes.length?internalGuestTypeFromName(officialGuestTypes[0].nome):"ospite_singolo";
+     if(hidden)hidden.value=officialGuestTypeCode(sel.value);
+   } else if(i>0 && hidden){
+     const internal=String(sel?.value||"ospite_singolo");
+     hidden.value=officialGuestTypeCode(internal)||hidden.value||"";
+   }
+ });
+ applyHeadGuestRule();
+}
+function renderDocumentTypeControls(){
+ document.querySelectorAll('[data-f="tipo_documento"]').forEach(sel=>{
+   const current=sel.value||"";
+   sel.innerHTML='<option value="">Seleziona</option>'+officialDocumentTypes.map(x=>`<option value="${escapeHtml(x.nome)}" data-code="${escapeHtml(x.codice)}">${escapeHtml(x.nome)}</option>`).join("");
+   if(current && officialDocumentTypes.some(x=>countryNorm(x.nome)===countryNorm(current)))sel.value=officialDocumentTypes.find(x=>countryNorm(x.nome)===countryNorm(current)).nome;
+   else if(!current){const preferred=officialDocumentTypes.find(x=>countryNorm(x.nome).includes("CARTA IDENTITA"));if(preferred)sel.value=preferred.nome;}
+ });
+}
+async function loadOfficialLookups(){await Promise.all([loadOfficialCountries(),loadOfficialGuestTypes(),loadOfficialDocumentTypes()]);}
+
+async function login(){const r=await fetch("/api/login",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({username:user.value,password:pass.value})});const j=await r.json();if(j.ok){token=j.token;localStorage.setItem("checkin_token",token);document.getElementById("login").classList.add("hidden");document.getElementById("app").classList.remove("hidden");syncGuests();setDepartureFromNights();loadOfficialLookups().catch(()=>{})}else show("loginMsg",j.error||"Accesso negato")}
 
 // Date handling deliberately avoids toISOString(), which converts midnight to UTC and
 // can shift an Italian calendar date back by one day.
@@ -118,15 +171,15 @@ function guestHtml(i){
 <div class="pill">Ospite ${i}</div>
 <div class="grid" style="margin-top:10px">
 ${first
- ? `<div><label>Tipologia Alloggiato</label><select data-f="tipologia" onchange="updateGuestType(0)"><option value="ospite_singolo">Ospite singolo</option><option value="capo_famiglia">Capo famiglia</option><option value="capo_gruppo">Capo gruppo</option><option value="familiare">Familiare</option><option value="membro_gruppo">Membro gruppo</option></select></div>`
- : `<div><label>Tipologia Alloggiato</label><input data-f="tipologia" readonly value="ospite_singolo"></div>`}
+ ? `<div><label>Tipologia Alloggiato</label><select data-f="tipologia" onchange="updateGuestType(0)"><option value="ospite_singolo">Ospite singolo</option><option value="capo_famiglia">Capo famiglia</option><option value="capo_gruppo">Capo gruppo</option><option value="familiare">Familiare</option><option value="membro_gruppo">Membro gruppo</option></select><input type="hidden" data-f="tipologia_code"></div>`
+ : `<div><label>Tipologia Alloggiato</label><input data-f="tipologia" readonly value="ospite_singolo"><input type="hidden" data-f="tipologia_code"></div>`}
 <div><label>Cittadinanza</label><div class="field-wrap"><input data-f="cittadinanza" autocomplete="off" oninput="handleNationalityInput(${i-1})" onfocus="openNationalityList(${i-1})" onblur="handleNationalityBlur(${i-1})"><input type="hidden" data-f="cittadinanza_code"><div id="nationalitySuggestions_${i-1}" class="country-suggestions hidden"></div></div><div id="nationalityHint_${i-1}" class="municipality-hint">Seleziona uno Stato dall'elenco ufficiale Alloggiati Web.</div></div>
 <div><label>Luogo di nascita</label><div class="field-wrap"><input data-f="luogo_nascita" autocomplete="off" oninput="handlePlaceInput(${i-1},'birth')" onblur="handlePlaceBlur(${i-1},'birth')"><div id="birthSuggestions_${i-1}" class="municipality-suggestions hidden"></div></div><div id="birthHint_${i-1}" class="municipality-hint"></div></div>
 <div><label>Cognome</label><input data-f="cognome"></div>
 <div><label>Nome</label><input data-f="nome"></div>
 <div><label>Data di nascita</label><input data-f="nascita" type="date"></div>
 <div><label>Sesso</label><select data-f="sesso"><option value="">Seleziona</option><option value="M">M</option><option value="F">F</option></select></div>
-${first?`<div class="doc-field"><label>Tipologia documento</label><select data-f="tipo_documento"><option value="">Seleziona</option><option value="Carta d'identità">Carta d'identità</option><option value="Passaporto">Passaporto</option><option value="Patente">Patente</option><option value="Altro">Altro</option></select></div>
+${first?`<div class="doc-field"><label>Tipologia documento</label><select data-f="tipo_documento"><option value="">Seleziona</option></select></div>
 <div class="doc-field"><label>Luogo di rilascio del documento</label><div class="field-wrap"><input data-f="luogo_rilascio_documento" autocomplete="off" oninput="handlePlaceInput(0,'issue')" onblur="handlePlaceBlur(0,'issue')"><div id="issueSuggestions_0" class="municipality-suggestions hidden"></div></div><div id="issueHint_0" class="municipality-hint"></div></div>
 <div class="doc-field"><label>Numero documento</label><input data-f="numero_documento"></div>`:`<input type="hidden" data-f="tipo_documento"><input type="hidden" data-f="luogo_rilascio_documento"><input type="hidden" data-f="numero_documento">`}
 </div>
@@ -139,14 +192,21 @@ function applyHeadGuestRule(){
  const first=getGuest(0); if(!first)return;
  const firstType=first.querySelector('[data-f="tipologia"]')?.value;
  const forced=firstType==="capo_famiglia"?"familiare":firstType==="capo_gruppo"?"membro_gruppo":"ospite_singolo";
+ const firstCode=officialGuestTypeCode(firstType)||first.querySelector('[data-f="tipologia_code"]')?.value||"";
+ const firstHidden=first.querySelector('[data-f="tipologia_code"]'); if(firstHidden&&firstType)firstHidden.value=firstCode;
  document.querySelectorAll('.guest').forEach((g,i)=>{
    if(i===0)return;
    const field=g.querySelector('[data-f="tipologia"]');
+   const code=g.querySelector('[data-f="tipologia_code"]');
    if(field)field.value=forced;
+   if(code)code.value=officialGuestTypeCode(forced)||"";
  });
 }
 function updateGuestType(index){
  const g=getGuest(index); if(!g)return;
+ const sel=g.querySelector('[data-f="tipologia"]');
+ const code=g.querySelector('[data-f="tipologia_code"]');
+ if(sel&&code)code.value=officialGuestTypeCode(sel.value)||sel.selectedOptions?.[0]?.dataset?.code||"";
  if(index===0) applyHeadGuestRule();
 }
 function isItalianNationality(value){
@@ -534,6 +594,6 @@ function showHistory(){api("/api/stays").then(r=>r.json()).then(rows=>show("serv
 document.getElementById("arrival").addEventListener("change",()=>setDepartureFromNights());
 document.getElementById("departure").addEventListener("change",setNightsFromDates);
 document.getElementById("nights").addEventListener("change",setDepartureFromNights);
-if(token){document.getElementById("login").classList.add("hidden");document.getElementById("app").classList.remove("hidden");syncGuests();setDepartureFromNights()}
+if(token){document.getElementById("login").classList.add("hidden");document.getElementById("app").classList.remove("hidden");syncGuests();setDepartureFromNights();loadOfficialLookups().catch(()=>{})}
 </script>
 </body></html>

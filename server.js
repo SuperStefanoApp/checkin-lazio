@@ -51,39 +51,70 @@ app.get("/api/health",(req,res)=>res.json({ok:true,service:"checkin-lazio",time:
 
 // Ricerca comuni italiani: proxy server-side verso un dataset aggiornato derivato da ISTAT.
 // Il frontend non contatta direttamente servizi esterni e riceve solo i campi necessari.
-const comuniCache = new Map();
-const nazioniCache = {time:0,items:[]};
-app.get("/api/nazioni",async(req,res)=>{
-  if(nazioniCache.items.length && (Date.now()-nazioniCache.time)<6*60*60*1000) return res.json({ok:true,items:nazioniCache.items,source:"alloggiati-web"});
+const lookupCache = new Map();
+const OFFICIAL_DOWNLOADS={
+  Comuni:"https://alloggiatiweb.poliziadistato.it/portalealloggiati/ashx/Download.ashx?ID=0&N=COMUNI",
+  Stati:"https://alloggiatiweb.poliziadistato.it/portalealloggiati/ashx/Download.ashx?ID=1&N=STATI",
+  Tipi_Documento:"https://alloggiatiweb.poliziadistato.it/portalealloggiati/ashx/Download.ashx?ID=2&N=DOCUMENTI",
+  Tipi_Alloggiato:"https://alloggiatiweb.poliziadistato.it/portalealloggiati/ashx/Download.ashx?ID=3&N=TIPO_ALLOGGIATO"
+};
+async function fetchOfficialDownload(tipo){
+  const url=OFFICIAL_DOWNLOADS[tipo];
+  if(!url) throw new Error(`Download ufficiale non configurato per ${tipo}`);
+  const r=await fetch(url,{headers:{Accept:"text/csv,text/plain,*/*","User-Agent":"CheckIn-Lazio/1.0"}});
+  if(!r.ok) throw new Error(`Alloggiati download HTTP ${r.status}`);
+  const buf=Buffer.from(await r.arrayBuffer());
+  if(buf.slice(0,2).toString("ascii")==="PK") throw new Error(`Il download ufficiale ${tipo} è un archivio compresso non gestito`);
+  let csv=new TextDecoder("utf-8").decode(buf).replace(/^\uFEFF/,"").trim();
+  if(!csv || !csv.includes(";")) throw new Error(`Download ufficiale ${tipo} non contiene un CSV valido`);
+  return csv;
+}
+async function officialLookup(tipo){
+  const cached=lookupCache.get(tipo);
+  if(cached && (Date.now()-cached.time)<6*60*60*1000) return cached.items;
+  let csv="";
+  let source="alloggiati-web-download";
   try{
+    csv=await fetchOfficialDownload(tipo);
+  }catch(downloadError){
+    // Fallback ufficiale via Web Service Alloggiati. La documentazione WS
+    // espone Luoghi, Tipi_Documento e Tipi_Alloggiato; per gli Stati il
+    // portale pubblica la tabella STATI separatamente.
     const token=await alloggiatiGenerateToken();
-    const csv=await alloggiatiTable(token,"Nazioni");
-    const items=csvRows(csv).slice(1).map(row=>({codice:String(row[0]||"").trim(),nome:String(row[1]||"").trim()})).filter(x=>x.codice&&x.nome);
-    if(!items.length) throw new Error("Tabella Nazioni vuota");
-    nazioniCache.time=Date.now();nazioniCache.items=items;
-    return res.json({ok:true,items,source:"alloggiati-web"});
-  }catch(e){
-    return res.status(502).json({ok:false,error:"TABELLA_NAZIONI_NON_DISPONIBILE",detail:String(e.message||e)});
+    const wsTipo=tipo==="Stati"?"Nazioni":tipo==="Comuni"?"Luoghi":tipo;
+    csv=await alloggiatiTable(token,wsTipo);
+    source="alloggiati-web-webservice";
   }
+  const rows=csvRows(csv).slice(1);
+  let items=[];
+  if(tipo==="Stati") items=rows.map(row=>({codice:String(row[0]||"").trim(),nome:String(row[1]||"").trim()})).filter(x=>x.codice&&x.nome);
+  else if(tipo==="Tipi_Documento" || tipo==="Tipi_Alloggiato") items=rows.map(row=>({codice:String(row[0]||"").trim(),nome:String(row[1]||"").trim()})).filter(x=>x.codice&&x.nome);
+  else if(tipo==="Comuni") items=rows.map(row=>({codice:String(row[0]||"").trim(),nome:String(row[1]||"").trim(),sigla:String(row[2]||row[3]||"").trim().toUpperCase()})).filter(x=>x.codice&&x.nome);
+  if(!items.length) throw new Error(`Tabella ufficiale ${tipo} vuota`);
+  lookupCache.set(tipo,{time:Date.now(),items,source});
+  return items;
+}
+app.get("/api/nazioni",async(req,res)=>{
+  try{return res.json({ok:true,items:await officialLookup("Stati"),source:"alloggiati-web"});}
+  catch(e){return res.status(502).json({ok:false,error:"TABELLA_STATI_NON_DISPONIBILE",detail:String(e.message||e)});}
+});
+app.get("/api/tipi-alloggiato",async(req,res)=>{
+  try{return res.json({ok:true,items:await officialLookup("Tipi_Alloggiato"),source:"alloggiati-web"});}
+  catch(e){return res.status(502).json({ok:false,error:"TABELLA_TIPI_ALLOGGIATO_NON_DISPONIBILE",detail:String(e.message||e)});}
+});
+app.get("/api/tipi-documento",async(req,res)=>{
+  try{return res.json({ok:true,items:await officialLookup("Tipi_Documento"),source:"alloggiati-web"});}
+  catch(e){return res.status(502).json({ok:false,error:"TABELLA_TIPI_DOCUMENTO_NON_DISPONIBILE",detail:String(e.message||e)});}
 });
 app.get("/api/comuni",async(req,res)=>{
   const q=String(req.query.q||"").trim();
   if(q.length<2) return res.json({ok:true,items:[]});
-  const key=q.toLocaleLowerCase("it-IT");
-  const cached=comuniCache.get(key);
-  if(cached && (Date.now()-cached.time)<10*60*1000) return res.json({ok:true,items:cached.items});
   try{
-    const url=`https://comuni-ita.nicolorebaioli.dev/v5/comuni?q=${encodeURIComponent(q)}&sort=nome&fields=nome,codice,sigla&pagesize=12`;
-    const r=await fetch(url,{headers:{Accept:"application/json","User-Agent":"CheckIn-Lazio/1.0"}});
-    if(!r.ok) throw new Error(`HTTP ${r.status}`);
-    const data=await r.json();
-    const raw=Array.isArray(data)?data:(Array.isArray(data?.data)?data.data:(Array.isArray(data?.items)?data.items:[]));
-    const items=raw.map(x=>({nome:String(x.nome||x.name||"").trim(),sigla:String(x.sigla||x.provincia?.sigla||"").trim().toUpperCase(),codice:String(x.codice||x.istat||"").trim()})).filter(x=>x.nome);
-    comuniCache.set(key,{time:Date.now(),items});
-    return res.json({ok:true,items});
-  }catch(e){
-    return res.status(502).json({ok:false,error:"RICERCA_COMUNI_NON_DISPONIBILE",detail:String(e.message||e)});
-  }
+    const all=await officialLookup("Comuni");
+    const nq=norm(q);
+    const items=all.filter(x=>norm(x.nome).startsWith(nq)||norm(x.nome).includes(nq)).slice(0,12);
+    return res.json({ok:true,items,source:"alloggiati-web"});
+  }catch(e){return res.status(502).json({ok:false,error:"RICERCA_COMUNI_NON_DISPONIBILE",detail:String(e.message||e)});}
 });
 app.post("/api/login",(req,res)=>{
   const {username,password}=req.body||{};
@@ -172,6 +203,8 @@ function fixed(v,n){return String(v||"").normalize("NFD").replace(/[\u0300-\u036
 async function buildAlloggiatiRecords(stay){
   const token=await alloggiatiGenerateToken();
   const luoghi=await alloggiatiTable(token,"Luoghi");
+  let statiCsv="";
+  try{statiCsv=await fetchOfficialDownload("Stati");}catch(_e){statiCsv=luoghi;}
   const docs=await alloggiatiTable(token,"Tipi_Documento");
   const types=await alloggiatiTable(token,"Tipi_Alloggiato");
   const typeCodes={
@@ -200,11 +233,12 @@ async function buildAlloggiatiRecords(stay){
       if(!String(g.stato_documento||'').trim()) g.stato_documento=countryToFull(g.cittadinanza);
     }
     const birthState=countryToFull(g.stato_nascita||g.stato_documento||g.cittadinanza);
-    const birthStateCode=findCode(luoghi,birthState||g.cittadinanza);
-    const nationalityCode=findCode(luoghi,g.cittadinanza);
+    const birthStateCode=findCode(statiCsv,birthState||g.cittadinanza);
+    const nationalityCode=findCode(statiCsv,g.cittadinanza);
     const birthPlaceCode=findCode(luoghi,g.luogo_nascita);
     const docCode=isComponent?"":findDocCode(docs,g.tipo_documento||"Carta identità");
-    const releaseCode=isComponent?"":findCode(luoghi,g.stato_documento||g.luogo_rilascio||g.cittadinanza);
+    const releaseValue=g.stato_documento||g.luogo_rilascio||g.cittadinanza;
+    const releaseCode=isComponent?"":(isItalianCountry(g.cittadinanza)?findCode(luoghi,releaseValue):findCode(statiCsv,releaseValue));
     const numeroDocumento=isComponent?"":g.numero_documento;
     const sesso=g.sesso==="M"?"1":g.sesso==="F"?"2":"";
     if(!g.cognome||!g.nome||!g.nascita||!sesso||!nationalityCode||!birthStateCode || (!isComponent && (!docCode||!numeroDocumento||!releaseCode))){
@@ -320,12 +354,14 @@ async function rossSend(stay){
   const roomsAvailable=Number(process.env.ROSS_ROOMS_AVAILABLE||1);
   const bedsAvailable=Number(process.env.ROSS_BEDS_AVAILABLE||stay.guests.length);
   const roomOccupied=1;
+  let typeCsv="";
   const rossTypeCodes={ospite_singolo:"16",capo_famiglia:"17",capo_gruppo:"18",familiare:"19",membro_gruppo:"20"};
   let nationCsv="";
   try{
     if(process.env.ALLOGGIATI_USER&&process.env.ALLOGGIATI_PASSWORD&&process.env.ALLOGGIATI_WSKEY){
       const tok=await alloggiatiGenerateToken();
       nationCsv=await alloggiatiTable(tok,"Nazioni");
+      typeCsv=await alloggiatiTable(tok,"Tipi_Alloggiato");
     }
   }catch(_e){}
   const codeOrValue=(v)=>{
@@ -340,7 +376,7 @@ async function rossSend(stay){
   const rossRecordId=(guestIndex)=>`CL${String(stay.arrival||"").slice(0,4)}${String(stay.id)}-${guestIndex+1}`;
   const arrivi=stay.guests.map((g,i)=>{
     const guestType=String(g.tipologia||"ospite_singolo");
-    const typeCode=rossTypeCodes[guestType]||"16";
+    const typeCode=typeCsv?findCode(typeCsv,guestType==="ospite_singolo"?"Ospite Singolo":guestType==="capo_famiglia"?"Capo Famiglia":guestType==="capo_gruppo"?"Capo Gruppo":guestType==="familiare"?"Familiare":"Membro Gruppo"):(rossTypeCodes[guestType]||"16");
     const idcapo=(guestType==="familiare"||guestType==="membro_gruppo")?rossRecordId(0):"";
     const idswh=rossRecordId(i);
     const cittadinanza=codeOrValue(g.cittadinanza_code||g.cittadinanza);
