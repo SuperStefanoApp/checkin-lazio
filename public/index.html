@@ -402,6 +402,8 @@ function collectGuests(){
    if(o.cittadinanza_code) o.cittadinanza_code=String(o.cittadinanza_code).trim();
    if(g.dataset.birthStateCode) o.stato_nascita_code=String(g.dataset.birthStateCode).trim();
    if(g.dataset.issuingStateCode) o.stato_documento_code=String(g.dataset.issuingStateCode).trim();
+   if(g.dataset.birthMunicipality) o.luogo_nascita=String(g.dataset.birthMunicipality).trim();
+   if(g.dataset.issuingMunicipality) o.luogo_rilascio_documento=String(g.dataset.issuingMunicipality).trim();
    if(o.cittadinanza && isItalianNationality(o.cittadinanza)){
      o.provincia_nascita=String(g.dataset.birthProvince||g.querySelector('[data-f="luogo_nascita"]')?.dataset.municipalityProvince||"").toUpperCase();
    }
