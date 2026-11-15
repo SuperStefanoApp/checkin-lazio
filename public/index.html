@@ -517,9 +517,16 @@ function icaoFieldCheck(field,check){
 function parseIcaoMrz(raw){
  const lines=extractMrzCandidates(raw);
  // TD3 passport: line 1 contains the ICAO name field at positions 6-44.
- // We can safely extract surname/given names even if the OCR returned only
- // the first MRZ line; the second line is needed only for the fixed data fields.
- let l1=lines.find(x=>/^P</.test(x)&&x.replace(/\s+/g,"").length>=30);
+ // Do not require the OCR to recognize the initial "P<". Some cameras/OCR
+ // engines lose the first character or the filler immediately after it. When
+ // two MRZ lines have the expected fixed width, the ICAO field positions are
+ // still enough to identify and parse a TD3 passport safely.
+ const compactLines=lines.map(x=>x.replace(/\s+/g,""));
+ let l1=lines.find(x=>/^P</i.test(x)&&x.replace(/\s+/g,"").length>=30);
+ if(!l1){
+   const idx=compactLines.findIndex((x,i)=>x.length>=42 && x.length<=45 && compactLines.some((y,j)=>j!==i&&y.length>=42&&y.length<=45));
+   if(idx>=0) l1=lines[idx];
+ }
  let l2=l1?lines.find(x=>x!==l1&&x.replace(/\s+/g,"").length>=36):null;
  if(l1){
    const compact1=l1.replace(/\s+/g,"");
@@ -551,10 +558,18 @@ function parsePassportMrzNames(raw){
    return {surname:parsed.name.surname,given:parsed.name.given};
  }
  // Conservative fallback for a partially recognized passport line.
+ // Again, do not make the initial P< mandatory: OCR may lose it even when
+ // the rest of the fixed-width ICAO structure is perfectly readable.
  const lines=mrzRawLines(repairMrzSeparators(raw)).map(x=>x.replace(/\s+$/g,""));
- const line1=lines.find(x=>/^P</i.test(x));
+ let line1=lines.find(x=>/^P</i.test(x));
+ if(!line1){
+   const compact=lines.map(x=>x.replace(/\s+/g,""));
+   const idx=compact.findIndex((x,i)=>x.length>=42&&x.length<=45&&compact.some((y,j)=>j!==i&&y.length>=42&&y.length<=45));
+   if(idx>=0) line1=lines[idx];
+ }
  if(!line1) return null;
- let nameField=line1.length>=44 ? line1.slice(5,44) : line1.slice(5,36);
+ const compactLine1=line1.replace(/\s+/g,"");
+ let nameField=compactLine1.length>=44 ? compactLine1.slice(5,44) : compactLine1.slice(5,36);
  nameField=normalizeMrzGlyphs(nameField).replace(/\s+/g,"<");
  const sep=nameField.indexOf("<<");
  if(sep<0)return null;
