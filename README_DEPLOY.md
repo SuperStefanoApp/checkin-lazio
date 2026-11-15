@@ -1,9 +1,27 @@
-# CheckIn Lazio V33
+# CheckIn Lazio V34
 
-## V33 – MRZ ICAO fallback
-- The ICAO parser now runs even when `web-mrz-reader` returns no parsed object.
-- Raw OCR MRZ lines can populate the guest fields through the internal ICAO parser.
-- A failed third-party validation/check digit no longer prevents structurally recognized MRZ data from being inserted.
-- Existing MRZ, country, document and municipality logic is preserved.
+V34 include:
+- cronologia persistente dei check-in salvati;
+- cronologia dettagliata delle trasmissioni Alloggiati Web e ROSS 1000;
+- salvataggio della richiesta XML inviata e della risposta ricevuta, per il confronto;
+- possibilità di selezionare uno storico e riutilizzarlo per una nuova trasmissione;
+- pulsante ROSS 1000 “Ritrasmetti/modifica” che mantiene gli stessi `idswh` del soggiorno e ritrasmette il movimento del giorno di arrivo, secondo il tracciato XML ROSS 1000;
+- mantenimento delle correzioni già presenti per MRZ/ICAO, gruppi/famiglie, tabelle ufficiali Alloggiati e campi automatici.
 
-Deploy the contents of this folder in the repository root and let Render redeploy.
+## Deploy
+
+Sostituire i file del repository con quelli contenuti nello ZIP e lasciare che Render esegua il deploy automatico.
+
+Le variabili d'ambiente già utilizzate restano necessarie:
+- ADMIN_USER
+- ADMIN_PASSWORD
+- SESSION_SECRET
+- ALLOGGIATI_USER
+- ALLOGGIATI_PASSWORD
+- ALLOGGIATI_WSKEY
+- ROSS_USER
+- ROSS_PASSWORD
+- ROSS_STRUCTURE_CODE
+- ROSS_ENDPOINT
+
+Il database SQLite mantiene le tabelle `stays` e `submissions`; V34 aggiunge automaticamente le colonne necessarie alla cronologia senza richiedere una migrazione manuale.

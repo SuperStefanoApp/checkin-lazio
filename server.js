@@ -24,9 +24,18 @@ CREATE TABLE IF NOT EXISTS submissions (
   service TEXT NOT NULL,
   status TEXT NOT NULL,
   detail TEXT,
+  request_payload TEXT,
+  response_payload TEXT,
   created_at TEXT NOT NULL
 );
+
 `);
+
+// Migrazione compatibile con le installazioni già esistenti: la cronologia
+// conserva anche richiesta e risposta effettivamente trasmesse ai servizi.
+for (const col of ["request_payload", "response_payload"]) {
+  try { db.exec(`ALTER TABLE submissions ADD COLUMN ${col} TEXT`); } catch (_) {}
+}
 
 app.use(express.json({limit:"10mb"}));
 app.use(express.static(path.join(__dirname,"public")));
@@ -138,7 +147,19 @@ app.get("/api/stays",(req,res)=>{
   const rows=db.prepare("SELECT * FROM stays ORDER BY id DESC LIMIT 100").all();
   res.json(rows.map(r=>({...r,guests:JSON.parse(r.guests_json)})));
 });
-app.get("/api/submissions",(req,res)=>res.json(db.prepare("SELECT * FROM submissions ORDER BY id DESC LIMIT 200").all()));
+app.get("/api/submissions",(req,res)=>{
+  const rows=db.prepare(`SELECT s.*, st.arrival, st.nights, st.departure, st.guests_json
+    FROM submissions s JOIN stays st ON st.id=s.stay_id
+    ORDER BY s.id DESC LIMIT 300`).all();
+  res.json(rows.map(r=>({...r,guests:JSON.parse(r.guests_json),guests_json:undefined})));
+});
+app.get("/api/history",(req,res)=>{
+  const stays=db.prepare("SELECT * FROM stays ORDER BY id DESC LIMIT 100").all();
+  const submissions=db.prepare("SELECT * FROM submissions ORDER BY id DESC LIMIT 300").all();
+  const byStay=new Map();
+  for(const s of submissions){ if(!byStay.has(s.stay_id)) byStay.set(s.stay_id,[]); byStay.get(s.stay_id).push(s); }
+  res.json(stays.map(st=>({...st,guests:JSON.parse(st.guests_json),submissions:byStay.get(st.id)||[]})));
+});
 
 function xmlEscape(s=""){return String(s).replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/"/g,"&quot;").replace(/'/g,"&apos;");}
 function tag(text,name){const re=new RegExp(`<${name}(?:\\s[^>]*)?>([\\s\\S]*?)</${name}>`,`i`);return (text.match(re)||[])[1]||"";}
@@ -267,6 +288,7 @@ async function alloggiatiSend(stay){
   const body=apartmentId
     ? `<all:GestioneAppartamenti_Send><all:Utente>${xmlEscape(process.env.ALLOGGIATI_USER)}</all:Utente><all:token>${xmlEscape(token)}</all:token><all:ElencoSchedine>${inner}</all:ElencoSchedine><all:IdAppartamento>${xmlEscape(apartmentId)}</all:IdAppartamento></all:GestioneAppartamenti_Send>`
     : `<all:Send><all:Utente>${xmlEscape(process.env.ALLOGGIATI_USER)}</all:Utente><all:token>${xmlEscape(token)}</all:token><all:ElencoSchedine>${inner}</all:ElencoSchedine></all:Send>`;
+  const envelope=`<?xml version="1.0" encoding="utf-8"?><soap:Envelope xmlns:soap="http://www.w3.org/2003/05/soap-envelope" xmlns:all="AlloggiatiService"><soap:Header/><soap:Body>${body}</soap:Body></soap:Envelope>`;
   const text=await soapCall(method,body);
   const valid=Number(tag(text,"SchedineValide")||0);
   const detail=allTags(text,"EsitoOperazioneServizio").map(x=>({esito:tag(x,"esito"),codice:tag(x,"ErroreCod"),descrizione:tag(x,"ErroreDes"),dettaglio:tag(x,"ErroreDettaglio")}));
@@ -275,7 +297,7 @@ async function alloggiatiSend(stay){
   const apartmentError=!apartmentId && /Gestore di Appartamenti/i.test(`${general.errore} ${detail.map(x=>x.descrizione||x.dettaglio||"").join(" ")}`)
     ? "L'utenza Alloggiati è di categoria Gestione Appartamenti. Configura ALLOGGIATI_ID_APPARTAMENTO con l'ID dell'appartamento presente in Alloggiati Web (Appartamenti > Elenco), poi ripeti l'invio."
     : "";
-  return {ok:valid===records.length,status:valid===records.length?"sent":"partial",valid,total:records.length,detail,general,method,apartment_id:apartmentId||null,configuration_error:apartmentError};
+  return {ok:valid===records.length,status:valid===records.length?"sent":"partial",valid,total:records.length,detail,general,method,apartment_id:apartmentId||null,configuration_error:apartmentError,request_xml:envelope,raw:text.slice(0,5000)};
 }
 
 app.post("/api/test/alloggiati",async(req,res)=>{
@@ -318,6 +340,11 @@ app.post("/api/test/ross1000",async(req,res)=>{
     res.status(502).json({ok:false,error:String(e.message||e)})
   }
 });
+function saveSubmission(stayId,service,result,requestPayload="",responsePayload="") {
+  db.prepare(`INSERT INTO submissions(stay_id,service,status,detail,request_payload,response_payload,created_at)
+    VALUES(?,?,?,?,?,?,?)`).run(stayId,service,result.status||"error",JSON.stringify(result),requestPayload,responsePayload||result.raw||"",new Date().toISOString());
+}
+
 app.post("/api/submit/:service/:stayId",async(req,res)=>{
   const service=req.params.service;
   const row=db.prepare("SELECT * FROM stays WHERE id=?").get(req.params.stayId);
@@ -326,21 +353,39 @@ app.post("/api/submit/:service/:stayId",async(req,res)=>{
   try{
     if(service==="alloggiati"){
       const result=await alloggiatiSend(stay);
-      const detail=JSON.stringify(result);
-      db.prepare("INSERT INTO submissions(stay_id,service,status,detail,created_at) VALUES(?,?,?,?,?)").run(row.id,service,result.status,detail,new Date().toISOString());
+      saveSubmission(row.id,service,result,result.request_xml||"",result.raw||"");
       return res.json(result);
     }
     if(service==="ross1000"){
       if(!process.env.ROSS_USER||!process.env.ROSS_PASSWORD||!process.env.ROSS_STRUCTURE_CODE) throw new Error("ROSS 1000 non configurato: servono ROSS_USER, ROSS_PASSWORD e ROSS_STRUCTURE_CODE.");
       const result=await rossSend(stay);
-      db.prepare("INSERT INTO submissions(stay_id,service,status,detail,created_at) VALUES(?,?,?,?,?)").run(row.id,service,result.status,JSON.stringify(result),new Date().toISOString());
+      saveSubmission(row.id,service,result,result.request_xml||"",result.raw||"");
       return res.json(result);
     }
     res.status(400).json({error:"SERVIZIO_NON_SUPPORTATO"});
   }catch(e){
     const detail=String(e.message||e);
-    db.prepare("INSERT INTO submissions(stay_id,service,status,detail,created_at) VALUES(?,?,?,?,?)").run(row.id,service,"error",detail,new Date().toISOString());
+    saveSubmission(row.id,service,{status:"error",error:detail},"",detail);
     res.status(502).json({ok:false,status:"error",error:detail});
+  }
+});
+
+app.post("/api/submit/ross1000/modify/:stayId",async(req,res)=>{
+  const row=db.prepare("SELECT * FROM stays WHERE id=?").get(req.params.stayId);
+  if(!row) return res.status(404).json({error:"SOGGIORNO_NON_TROVATO"});
+  const stay={...row,guests:JSON.parse(row.guests_json)};
+  try{
+    if(!process.env.ROSS_USER||!process.env.ROSS_PASSWORD||!process.env.ROSS_STRUCTURE_CODE) throw new Error("ROSS 1000 non configurato: servono ROSS_USER, ROSS_PASSWORD e ROSS_STRUCTURE_CODE.");
+    const result=await rossSend(stay);
+    result.message=result.ok
+      ? "ROSS 1000: modifica/ritrasmissione inviata mantenendo gli stessi idswh del soggiorno. Il tracciato prevede la ritrasmissione del movimento del giorno di arrivo per modificare dati già trasmessi."
+      : (result.error||result.message);
+    saveSubmission(row.id,"ross1000-modifica",result,result.request_xml||"",result.raw||"");
+    return res.json(result);
+  }catch(e){
+    const detail=String(e.message||e);
+    saveSubmission(row.id,"ross1000-modifica",{status:"error",error:detail},"",detail);
+    return res.status(502).json({ok:false,status:"error",error:detail});
   }
 });
 
@@ -393,10 +438,10 @@ async function rossSend(stay){
   const text=await r.text();
   if(!r.ok) throw new Error(`ROSS HTTP ${r.status}: ${text.slice(0,1200)}`);
   const fault=tag(text,"faultstring")||tag(text,"detail");
-  if(fault) return {ok:false,status:"error",error:fault,raw:text.slice(0,5000)};
+  if(fault) return {ok:false,status:"error",error:fault,raw:text.slice(0,5000),request_xml:xml};
   const responseError=tag(text,"ErroreDettaglio")||tag(text,"errore")||tag(text,"error");
-  if(responseError) return {ok:false,status:"error",error:`ROSS 1000: ${responseError}`,raw:text.slice(0,5000)};
-  return {ok:true,status:"sent",message:"ROSS 1000: richiesta SOAP inviata. Identificativi idswh univoci per il soggiorno; camera occupata conteggiata una sola volta; per familiari/membri di gruppo sono stati inviati tipo e idcapo previsti.",raw:text.slice(0,5000)};
+  if(responseError) return {ok:false,status:"error",error:`ROSS 1000: ${responseError}`,raw:text.slice(0,5000),request_xml:xml};
+  return {ok:true,status:"sent",message:"ROSS 1000: richiesta SOAP inviata. Identificativi idswh univoci per il soggiorno; camera occupata conteggiata una sola volta; per familiari/membri di gruppo sono stati inviati tipo e idcapo previsti. In caso di modifica, lo stesso idswh viene mantenuto.",raw:text.slice(0,5000),request_xml:xml};
 }
 
 app.get(/.*/, (req,res)=>res.sendFile(path.join(__dirname,"public","index.html")));

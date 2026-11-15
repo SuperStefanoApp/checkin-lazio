@@ -664,7 +664,47 @@ async function sendService(service){
  }catch(e){show("serviceMsg",`Errore di comunicazione: ${e.message||e}`)}
 }
 
-function showHistory(){api("/api/stays").then(r=>r.json()).then(rows=>show("serviceMsg",`Storico: ${rows.length} soggiorni presenti.`))}
+function escHtml(v){return String(v??"").replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/"/g,"&quot;").replace(/'/g,"&#039;");}
+function historyStatusLabel(s){
+ const x=String(s||"");
+ if(x==="sent")return {t:"Inviato",c:"ok"};
+ if(x==="partial")return {t:"Parzialmente accettato",c:"partial"};
+ if(x==="error")return {t:"Errore",c:"err"};
+ return {t:x||"N/D",c:""};
+}
+async function showHistory(){
+ const box=document.getElementById("historyBox"),list=document.getElementById("historyList");
+ box.classList.remove("hidden"); list.innerHTML="<div class='status'>Caricamento cronologia…</div>";
+ try{
+   const r=await api("/api/history"); const rows=await r.json();
+   if(!Array.isArray(rows)||!rows.length){list.innerHTML="<div class='history-empty'>Nessun check-in salvato.</div>";return;}
+   list.innerHTML=rows.map(st=>{
+     const guests=(st.guests||[]).map((g,i)=>`${i+1}. ${escHtml(g.cognome||"")} ${escHtml(g.nome||"")} — ${escHtml(g.tipologia||"ospite_singolo")}`).join("<br>");
+     const subs=(st.submissions||[]).map(sub=>{
+       const hs=historyStatusLabel(sub.status);
+       const svc=sub.service==="alloggiati"?"Alloggiati Web":sub.service==="ross1000"?"ROSS 1000":"ROSS 1000 — modifica/ritrasmissione";
+       return `<div class="history-sub"><div><strong>${escHtml(svc)}</strong> — <span class="history-status ${hs.c}">${escHtml(hs.t)}</span></div><div class="history-meta">${escHtml(new Date(sub.created_at).toLocaleString("it-IT"))}</div>${sub.detail?`<details><summary>Esito e dettagli ricevuti</summary><div class="history-code">${escHtml(sub.detail)}</div></details>`:""}${sub.request_payload?`<details><summary>XML effettivamente inviato</summary><div class="history-code">${escHtml(sub.request_payload)}</div></details>`:""}${sub.response_payload?`<details><summary>Risposta grezza del portale</summary><div class="history-code">${escHtml(sub.response_payload)}</div></details>`:""}</div>`;
+     }).join("") || `<div class="history-meta" style="margin-top:8px">Nessuna trasmissione ancora effettuata.</div>`;
+     return `<div class="history-item"><div class="history-head"><div><strong>Check-in #${st.id}</strong><div class="history-meta">Arrivo: ${escHtml(st.arrival)} · Partenza: ${escHtml(st.departure)} · Notti: ${escHtml(st.nights)}</div></div><div class="history-meta">Salvato: ${escHtml(new Date(st.created_at).toLocaleString("it-IT"))}</div></div><div class="history-guests">${guests}</div><div class="history-actions"><button class="secondary" type="button" onclick="useStayForTransmission(${st.id})">Usa questo check-in</button><button class="secondary" type="button" onclick="modifyRossFromHistory(${st.id})">Ritrasmetti/modifica ROSS 1000</button></div>${subs}</div>`;
+   }).join("");
+ }catch(e){list.innerHTML=`<div class="warning-box">Errore nel caricamento della cronologia: ${escHtml(e.message||e)}</div>`;}
+}
+async function useStayForTransmission(id){
+ window.lastStayId=id;
+ document.getElementById("sendBox").classList.remove("hidden");
+ show("serviceMsg",`Check-in #${id} selezionato. Ora puoi inviare nuovamente i dati ai servizi.`);
+ window.scrollTo({top:document.body.scrollHeight,behavior:"smooth"});
+}
+async function modifyRossFromHistory(id){
+ if(!confirm("Vuoi ritrasmettere a ROSS 1000 questo check-in come modifica, mantenendo gli stessi identificativi idswh?"))return;
+ show("serviceMsg","ROSS 1000: invio della modifica in corso…");
+ try{
+   const r=await api(`/api/submit/ross1000/modify/${id}`,{method:"POST"});
+   const j=await r.json();
+   show("serviceMsg",j.ok?(j.message||"ROSS 1000: modifica inviata."):(j.error||j.detail||"ROSS 1000: modifica non riuscita."));
+   await showHistory();
+ }catch(e){show("serviceMsg",`Errore di comunicazione: ${e.message||e}`)}
+}
 
 document.getElementById("arrival").addEventListener("change",()=>setDepartureFromNights());
 document.getElementById("departure").addEventListener("change",setNightsFromDates);
