@@ -143,9 +143,25 @@ app.post("/api/stays",(req,res)=>{
     .run(arrival,Number(nights),departure,JSON.stringify(guests),new Date().toISOString());
   res.json({ok:true,id:info.lastInsertRowid});
 });
+app.put("/api/stays/:id",(req,res)=>{
+  const {arrival,nights,departure,guests}=req.body||{};
+  if(!arrival||!departure||!Number.isInteger(Number(nights))||Number(nights)<1||Number(nights)>30||!Array.isArray(guests)||guests.length<1)
+    return res.status(400).json({error:"DATI_INCOMPLETI_O_NUOVI_LIMITI"});
+  const id=Number(req.params.id);
+  const exists=db.prepare("SELECT id FROM stays WHERE id=?").get(id);
+  if(!exists)return res.status(404).json({error:"SOGGIORNO_NON_TROVATO"});
+  db.prepare("UPDATE stays SET arrival=?,nights=?,departure=?,guests_json=? WHERE id=?")
+    .run(arrival,Number(nights),departure,JSON.stringify(guests),id);
+  res.json({ok:true,id});
+});
 app.get("/api/stays",(req,res)=>{
   const rows=db.prepare("SELECT * FROM stays ORDER BY id DESC LIMIT 100").all();
   res.json(rows.map(r=>({...r,guests:JSON.parse(r.guests_json)})));
+});
+app.get("/api/stays/:id",(req,res)=>{
+  const r=db.prepare("SELECT * FROM stays WHERE id=?").get(Number(req.params.id));
+  if(!r)return res.status(404).json({error:"SOGGIORNO_NON_TROVATO"});
+  res.json({...r,guests:JSON.parse(r.guests_json)});
 });
 app.get("/api/submissions",(req,res)=>{
   const rows=db.prepare(`SELECT s.*, st.arrival, st.nights, st.departure, st.guests_json
@@ -262,16 +278,28 @@ async function buildAlloggiatiRecords(stay){
       if(!String(g.stato_documento||'').trim()) g.stato_documento=countryToFull(g.cittadinanza);
     }
     const birthState=countryToFull(g.stato_nascita||g.stato_documento||g.cittadinanza);
-    const birthStateCode=findCode(statiCsv,birthState||g.cittadinanza);
-    const nationalityCode=findCode(statiCsv,g.cittadinanza);
-    const birthPlaceCode=findCode(luoghi,g.luogo_nascita);
-    const docCode=isComponent?"":findDocCode(docs,g.tipo_documento||"Carta identità");
+    // Preferiamo i codici ufficiali già selezionati nell'interfaccia. Se non
+    // sono presenti, li risolviamo comunque tramite le tabelle Alloggiati.
+    const birthStateCode=String(g.stato_nascita_code||g.birth_state_code||"").trim() || findCode(statiCsv,birthState||g.cittadinanza);
+    const nationalityCode=String(g.cittadinanza_code||"").trim() || findCode(statiCsv,g.cittadinanza);
+    const birthPlaceCode=String(g.luogo_nascita_code||g.birth_municipality_code||"").trim() || findCode(luoghi,g.luogo_nascita);
+    const docCode=isComponent?"":(String(g.tipo_documento_code||"").trim() || findDocCode(docs,g.tipo_documento||"Carta identità"));
     const releaseValue=g.stato_documento||g.luogo_rilascio||g.cittadinanza;
-    const releaseCode=isComponent?"":(isItalianCountry(g.cittadinanza)?findCode(luoghi,releaseValue):findCode(statiCsv,releaseValue));
+    const releaseCode=isComponent?"":(String(g.stato_documento_code||g.luogo_rilascio_documento_code||g.issuing_country_code||"").trim() || (isItalianCountry(g.cittadinanza)?findCode(luoghi,releaseValue):findCode(statiCsv,releaseValue)));
     const numeroDocumento=isComponent?"":g.numero_documento;
     const sesso=g.sesso==="M"?"1":g.sesso==="F"?"2":"";
-    if(!g.cognome||!g.nome||!g.nascita||!sesso||!nationalityCode||!birthStateCode || (!isComponent && (!docCode||!numeroDocumento||!releaseCode))){
-      problems.push(`Ospite ${i+1}: dati/codici mancanti (controlla nascita, cittadinanza, sesso${isComponent?"":" , documento e luogo rilascio"}).`); continue;
+    const missing=[];
+    if(!g.cognome)missing.push("cognome");
+    if(!g.nome)missing.push("nome");
+    if(!g.nascita)missing.push("data nascita");
+    if(!sesso)missing.push("sesso");
+    if(!nationalityCode)missing.push(`cittadinanza (${g.cittadinanza||"vuota"})`);
+    if(!birthStateCode)missing.push(`stato nascita (${birthState||"vuoto"})`);
+    if(!isComponent && !docCode)missing.push(`documento (${g.tipo_documento||"vuoto"})`);
+    if(!isComponent && !numeroDocumento)missing.push("numero documento");
+    if(!isComponent && !releaseCode)missing.push(`luogo rilascio (${releaseValue||"vuoto"})`);
+    if(missing.length){
+      problems.push(`Ospite ${i+1}: dati/codici mancanti: ${missing.join(", ")}.`); continue;
     }
     if(birthStateCode==="100000100"&&!birthPlaceCode) problems.push(`Ospite ${i+1}: luogo di nascita "${g.luogo_nascita}" non trovato nella tabella Alloggiati.`);
     const line = fixed(typeCode,2)+fixed(isoToDMY(stay.arrival),10)+fixed(String(stay.nights).padStart(2,"0"),2)+fixed(g.cognome,50)+fixed(g.nome,30)+fixed(sesso,1)+fixed(isoToDMY(g.nascita),10)+fixed(birthStateCode==="100000100"?birthPlaceCode:"",9)+fixed(birthStateCode==="100000100"?(g.provincia_nascita||""):"",2)+fixed(birthStateCode,9)+fixed(nationalityCode,9)+fixed(docCode,5)+fixed(numeroDocumento,20)+fixed(releaseCode,9);

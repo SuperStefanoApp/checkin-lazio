@@ -59,7 +59,7 @@
 <h2>Trasmissioni</h2>
 <div class="row"><button onclick="testService('alloggiati')">Test Alloggiati</button><button onclick="testService('ross1000')">Verifica ROSS 1000</button><button onclick="showHistory()">Storico</button></div><div id="sendBox" class="hidden" style="margin-top:12px"><div class="small">Dopo aver salvato il check-in, puoi inviare i dati ai due servizi separatamente.</div><div class="row" style="margin-top:10px"><button onclick="sendService('alloggiati')">Invia ad Alloggiati Web</button><button onclick="sendService('ross1000')">Invia a ROSS 1000</button></div></div>
 <div id="serviceMsg" class="status hidden"></div>
-<div id="historyBox" class="hidden" style="margin-top:14px">
+<div id="historyBox" style="margin-top:14px">
   <h3 style="margin:0 0 8px">Cronologia check-in e trasmissioni</h3>
   <div class="small">Qui vengono conservati i soggiorni salvati e, per ogni invio, la risposta ricevuta dal servizio. In questo modo puoi confrontare ciò che CheckIn Lazio ha trasmesso con l'esito restituito da Alloggiati Web e ROSS 1000.</div>
   <div id="historyList" style="margin-top:10px"></div>
@@ -75,6 +75,7 @@
 
 <script>
 let token=localStorage.getItem("checkin_token")||"";
+let editingStayId=null;
 let mrzReader=null;
 let mrzStarting=false;
 const COUNTRY_NAMES = {"ABW": "Aruba", "AFG": "Afghanistan", "AGO": "Angola", "AIA": "Anguilla", "ALA": "Isole Åland", "ALB": "Albania", "AND": "Andorra", "ARE": "Emirati Arabi Uniti", "ARG": "Argentina", "ARM": "Armenia", "ASM": "Samoa Americane", "ATA": "Antartide", "ATF": "Terre Australi Francesi", "ATG": "Antigua e Barbuda", "AUS": "Australia", "AUT": "Austria", "AZE": "Azerbaigian", "BDI": "Burundi", "BEL": "Belgio", "BEN": "Benin", "BES": "Caraibi Olandesi", "BFA": "Burkina Faso", "BGD": "Bangladesh", "BGR": "Bulgaria", "BHR": "Bahrein", "BHS": "Bahamas", "BIH": "Bosnia ed Erzegovina", "BLM": "Saint-Barthélemy", "BLR": "Bielorussia", "BLZ": "Belize", "BMU": "Bermuda", "BOL": "Bolivia", "BRA": "Brasile", "BRB": "Barbados", "BRN": "Brunei", "BTN": "Bhutan", "BVT": "Isola Bouvet", "BWA": "Botswana", "CAF": "Repubblica Centrafricana", "CAN": "Canada", "CCK": "Isole Cocos (Keeling)", "CHE": "Svizzera", "CHL": "Cile", "CHN": "Cina", "CIV": "Costa d’Avorio", "CMR": "Camerun", "COD": "Congo - Kinshasa", "COG": "Congo-Brazzaville", "COK": "Isole Cook", "COL": "Colombia", "COM": "Comore", "CPV": "Capo Verde", "CRI": "Costa Rica", "CUB": "Cuba", "CUW": "Curaçao", "CXR": "Isola Christmas", "CYM": "Isole Cayman", "CYP": "Cipro", "CZE": "Cechia", "DEU": "Germania", "DJI": "Gibuti", "DMA": "Dominica", "DNK": "Danimarca", "DOM": "Repubblica Dominicana", "DZA": "Algeria", "ECU": "Ecuador", "EGY": "Egitto", "ERI": "Eritrea", "ESH": "Sahara Occidentale", "ESP": "Spagna", "EST": "Estonia", "ETH": "Etiopia", "FIN": "Finlandia", "FJI": "Figi", "FLK": "Isole Falkland", "FRA": "Francia", "FRO": "Isole Fær Øer", "FSM": "Micronesia", "GAB": "Gabon", "GBR": "Regno Unito", "GEO": "Georgia", "GGY": "Guernsey", "GHA": "Ghana", "GIB": "Gibilterra", "GIN": "Guinea", "GLP": "Guadalupa", "GMB": "Gambia", "GNB": "Guinea-Bissau", "GNQ": "Guinea Equatoriale", "GRC": "Grecia", "GRD": "Grenada", "GRL": "Groenlandia", "GTM": "Guatemala", "GUF": "Guyana Francese", "GUM": "Guam", "GUY": "Guyana", "HKG": "RAS di Hong Kong", "HMD": "Isole Heard e McDonald", "HND": "Honduras", "HRV": "Croazia", "HTI": "Haiti", "HUN": "Ungheria", "IDN": "Indonesia", "IMN": "Isola di Man", "IND": "India", "IOT": "Territorio Britannico dell’Oceano Indiano", "IRL": "Irlanda", "IRN": "Iran", "IRQ": "Iraq", "ISL": "Islanda", "ISR": "Israele", "ITA": "Italia", "JAM": "Giamaica", "JEY": "Jersey", "JOR": "Giordania", "JPN": "Giappone", "KAZ": "Kazakistan", "KEN": "Kenya", "KGZ": "Kirghizistan", "KHM": "Cambogia", "KIR": "Kiribati", "KNA": "Saint Kitts e Nevis", "KOR": "Corea del Sud", "KWT": "Kuwait", "LAO": "Laos", "LBN": "Libano", "LBR": "Liberia", "LBY": "Libia", "LCA": "Saint Lucia", "LIE": "Liechtenstein", "LKA": "Sri Lanka", "LSO": "Lesotho", "LTU": "Lituania", "LUX": "Lussemburgo", "LVA": "Lettonia", "MAC": "RAS di Macao", "MAF": "Saint Martin", "MAR": "Marocco", "MCO": "Monaco", "MDA": "Moldavia", "MDG": "Madagascar", "MDV": "Maldive", "MEX": "Messico", "MHL": "Isole Marshall", "MKD": "Macedonia del Nord", "MLI": "Mali", "MLT": "Malta", "MMR": "Myanmar (Birmania)", "MNE": "Montenegro", "MNG": "Mongolia", "MNP": "Isole Marianne Settentrionali", "MOZ": "Mozambico", "MRT": "Mauritania", "MSR": "Montserrat", "MTQ": "Martinica", "MUS": "Mauritius", "MWI": "Malawi", "MYS": "Malaysia", "MYT": "Mayotte", "NAM": "Namibia", "NCL": "Nuova Caledonia", "NER": "Niger", "NFK": "Isola Norfolk", "NGA": "Nigeria", "NIC": "Nicaragua", "NIU": "Niue", "NLD": "Paesi Bassi", "NOR": "Norvegia", "NPL": "Nepal", "NRU": "Nauru", "NZL": "Nuova Zelanda", "OMN": "Oman", "PAK": "Pakistan", "PAN": "Panama", "PCN": "Isole Pitcairn", "PER": "Perù", "PHL": "Filippine", "PLW": "Palau", "PNG": "Papua Nuova Guinea", "POL": "Polonia", "PRI": "Portorico", "PRK": "Corea del Nord", "PRT": "Portogallo", "PRY": "Paraguay", "PSE": "Territori Palestinesi", "PYF": "Polinesia Francese", "QAT": "Qatar", "REU": "Riunione", "ROU": "Romania", "RUS": "Russia", "RWA": "Ruanda", "SAU": "Arabia Saudita", "SDN": "Sudan", "SEN": "Senegal", "SGP": "Singapore", "SGS": "Georgia del Sud e Sandwich Australi", "SHN": "Sant’Elena", "SJM": "Svalbard e Jan Mayen", "SLB": "Isole Salomone", "SLE": "Sierra Leone", "SLV": "El Salvador", "SMR": "San Marino", "SOM": "Somalia", "SPM": "Saint-Pierre e Miquelon", "SRB": "Serbia", "SSD": "Sud Sudan", "STP": "São Tomé e Príncipe", "SUR": "Suriname", "SVK": "Slovacchia", "SVN": "Slovenia", "SWE": "Svezia", "SWZ": "Eswatini", "SXM": "Sint Maarten", "SYC": "Seychelles", "SYR": "Siria", "TCA": "Isole Turks e Caicos", "TCD": "Ciad", "TGO": "Togo", "THA": "Thailandia", "TJK": "Tagikistan", "TKL": "Tokelau", "TKM": "Turkmenistan", "TLS": "Timor Est", "TON": "Tonga", "TTO": "Trinidad e Tobago", "TUN": "Tunisia", "TUR": "Turchia", "TUV": "Tuvalu", "TWN": "Taiwan", "TZA": "Tanzania", "UGA": "Uganda", "UKR": "Ucraina", "UMI": "Isole Minori Esterne degli Stati Uniti", "URY": "Uruguay", "USA": "Stati Uniti", "UZB": "Uzbekistan", "VAT": "Città del Vaticano", "VCT": "Saint Vincent e Grenadine", "VEN": "Venezuela", "VGB": "Isole Vergini Britanniche", "VIR": "Isole Vergini Americane", "VNM": "Vietnam", "VUT": "Vanuatu", "WLF": "Wallis e Futuna", "WSM": "Samoa", "XKX": "Kosovo", "YEM": "Yemen", "ZAF": "Sudafrica", "ZMB": "Zambia", "ZWE": "Zimbabwe"};
@@ -181,7 +182,7 @@ function renderDocumentTypeControls(){
 }
 async function loadOfficialLookups(){await Promise.all([loadOfficialCountries(),loadOfficialGuestTypes(),loadOfficialDocumentTypes()]);}
 
-async function login(){const r=await fetch("/api/login",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({username:user.value,password:pass.value})});const j=await r.json();if(j.ok){token=j.token;localStorage.setItem("checkin_token",token);document.getElementById("login").classList.add("hidden");document.getElementById("app").classList.remove("hidden");syncGuests();setDepartureFromNights();loadOfficialLookups().catch(()=>{})}else show("loginMsg",j.error||"Accesso negato")}
+async function login(){const r=await fetch("/api/login",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({username:user.value,password:pass.value})});const j=await r.json();if(j.ok){token=j.token;localStorage.setItem("checkin_token",token);document.getElementById("login").classList.add("hidden");document.getElementById("app").classList.remove("hidden");syncGuests();setDepartureFromNights();loadOfficialLookups().catch(()=>{});showHistory()}else show("loginMsg",j.error||"Accesso negato")}
 
 // Date handling deliberately avoids toISOString(), which converts midnight to UTC and
 // can shift an Italian calendar date back by one day.
@@ -404,21 +405,42 @@ function handlePlaceBlur(index,kind){
 function collectGuests(){
  return [...document.querySelectorAll(".guest")].map(g=>{
    const o=Object.fromEntries([...g.querySelectorAll("[data-f]")].map(x=>[x.dataset.f,x.value]));
-   if(o.cittadinanza_code) o.cittadinanza_code=String(o.cittadinanza_code).trim();
+   const citCode=g.querySelector('[data-f="cittadinanza"]')?.dataset.countryCode||g.querySelector('[data-f="cittadinanza_code"]')?.value||"";
+   if(citCode) o.cittadinanza_code=String(citCode).trim();
    if(g.dataset.birthStateCode) o.stato_nascita_code=String(g.dataset.birthStateCode).trim();
    if(g.dataset.issuingStateCode) o.stato_documento_code=String(g.dataset.issuingStateCode).trim();
-   if(g.dataset.birthMunicipality) o.luogo_nascita=String(g.dataset.birthMunicipality).trim();
-   if(g.dataset.issuingMunicipality) o.luogo_rilascio_documento=String(g.dataset.issuingMunicipality).trim();
+   const birth=g.querySelector('[data-f="luogo_nascita"]');
+   const issue=g.querySelector('[data-f="luogo_rilascio_documento"]');
+   if(birth?.dataset.municipalityCode) o.luogo_nascita_code=String(birth.dataset.municipalityCode).trim();
+   if(issue?.dataset.municipalityCode) o.luogo_rilascio_documento_code=String(issue.dataset.municipalityCode).trim();
+   if(issue?.dataset.countryCode) o.stato_documento_code=String(issue.dataset.countryCode).trim();
+   const doc=g.querySelector('[data-f="tipo_documento"]');
+   if(doc?.dataset.documentCode) o.tipo_documento_code=String(doc.dataset.documentCode).trim();
    if(o.cittadinanza && isItalianNationality(o.cittadinanza)){
-     o.provincia_nascita=String(g.dataset.birthProvince||g.querySelector('[data-f="luogo_nascita"]')?.dataset.municipalityProvince||"").toUpperCase();
+     o.provincia_nascita=String(g.dataset.birthProvince||birth?.dataset.municipalityProvince||"").toUpperCase();
    }
-   // I campi documento degli ospiti successivi sono nascosti nell'interfaccia,
-   // ma restano necessari per Alloggiati Web quando il documento è stato letto.
-   // Non eliminarli dalla struttura dati: sono valorizzati dai dati MRZ/OCR.
    return o;
  });
 }
-async function saveStay(){setNightsFromDates();if(!arrival.value||!departure.value||Number(nights.value)<1){show("saveMsg","Controlla arrivo e partenza: la partenza deve essere successiva all'arrivo.");return}const gs=collectGuests();const r=await api("/api/stays",{method:"POST",body:JSON.stringify({arrival:arrival.value,nights:Number(nights.value),departure:departure.value,guests:gs})});const j=await r.json();show("saveMsg",j.ok?`Check-in salvato. ID ${j.id}`:(j.error||"Errore")); if(j.ok){document.getElementById("sendBox").classList.remove("hidden");window.lastStayId=j.id}}
+async function saveStay(){
+ setNightsFromDates();
+ if(!arrival.value||!departure.value||Number(nights.value)<1){show("saveMsg","Controlla arrivo e partenza: la partenza deve essere successiva all'arrivo.");return}
+ const gs=collectGuests();
+ const payload={arrival:arrival.value,nights:Number(nights.value),departure:departure.value,guests:gs};
+ const url=editingStayId?`/api/stays/${editingStayId}`:"/api/stays";
+ const method=editingStayId?"PUT":"POST";
+ const r=await api(url,{method,body:JSON.stringify(payload)});
+ const j=await r.json();
+ show("saveMsg",j.ok?(editingStayId?`Check-in #${editingStayId} aggiornato.`:`Check-in salvato. ID ${j.id}`):(j.error||"Errore"));
+ if(j.ok){
+   window.lastStayId=j.id||editingStayId;
+   editingStayId=null;
+   document.getElementById("sendBox").classList.remove("hidden");
+   const btn=[...document.querySelectorAll('button')].find(x=>x.textContent.trim()==="Aggiorna check-in");
+   if(btn)btn.textContent="Salva check-in";
+   showHistory();
+ }
+}
 
 function mrzDate(v){if(!/^[0-9]{6}$/.test(v))return "";const yy=Number(v.slice(0,2)),mm=v.slice(2,4),dd=v.slice(4,6);const year=yy>=50?1900+yy:2000+yy;return `${year}-${mm}-${dd}`}
 
@@ -871,11 +893,76 @@ async function sendService(service){
  }catch(e){show("serviceMsg",`Errore di comunicazione: ${e.message||e}`)}
 }
 
-function showHistory(){api("/api/stays").then(r=>r.json()).then(rows=>show("serviceMsg",`Storico: ${rows.length} soggiorni presenti.`))}
+function escHtml(v){return String(v??"").replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/"/g,"&quot;").replace(/'/g,"&#39;");}
+async function modifyRoss(stayId,guestCount){
+  const previousArrival=prompt("Data di arrivo della comunicazione precedente ROSS 1000 (formato AAAA-MM-GG):","");
+  if(!previousArrival)return;
+  const ids=[];
+  for(let i=0;i<guestCount;i++){
+    const v=prompt(`IDSWH precedente dell'ospite ${i+1}.\nSe ROSS ti ha mostrato un ID come CL20261-1, inseriscilo esattamente così:`,i===0?"CL20261-1":"");
+    if(!v){show("serviceMsg","Rettifica annullata: manca l'IDSWH precedente dell'ospite "+(i+1)+".");return;}
+    ids.push(v.trim());
+  }
+  show("serviceMsg","Recupero comunicazione precedente e invio rettifica ROSS 1000 in corso…");
+  try{
+    const r=await api(`/api/submit/ross1000/modify/${stayId}`,{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({previousArrival:previousArrival.replaceAll("-","").trim(),previousIdswh:ids})});
+    const j=await r.json();
+    show("serviceMsg",j.ok?(j.message||"ROSS 1000: rettifica inviata."):(j.error||"ROSS 1000: rettifica non riuscita."));
+    if(j.ok) showHistory();
+  }catch(e){show("serviceMsg",`Errore di comunicazione: ${e.message||e}`)}
+}
+async function editStay(stayId){
+ try{
+   const r=await api(`/api/stays/${stayId}`);
+   const st=await r.json();
+   if(!r.ok)throw new Error(st.error||"Impossibile recuperare il soggiorno");
+   editingStayId=Number(st.id);
+   arrival.value=st.arrival||""; nights.value=st.nights||1; departure.value=st.departure||"";
+   party.value=(st.guests||[]).length||1; syncGuests();
+   (st.guests||[]).forEach((g,i)=>{
+     const el=getGuest(i);if(!el)return;
+     for(const [k,v] of Object.entries(g||{})){const f=el.querySelector(`[data-f="${k}"]`);if(f&&v!=null)f.value=v;}
+     const cit=el.querySelector('[data-f="cittadinanza"]');
+     if(cit&&g.cittadinanza_code){cit.dataset.countrySelected="1";cit.dataset.countryCode=g.cittadinanza_code;}
+     const doc=el.querySelector('[data-f="tipo_documento"]');
+     if(doc&&g.tipo_documento_code)doc.dataset.documentCode=g.tipo_documento_code;
+     const birth=el.querySelector('[data-f="luogo_nascita"]');
+     if(birth&&g.luogo_nascita_code){birth.dataset.municipalitySelected="1";birth.dataset.municipalityCode=g.luogo_nascita_code;birth.dataset.municipalityProvince=g.provincia_nascita||"";}
+     const issue=el.querySelector('[data-f="luogo_rilascio_documento"]');
+     if(issue&&g.luogo_rilascio_documento_code){issue.dataset.municipalitySelected="1";issue.dataset.municipalityCode=g.luogo_rilascio_documento_code;}
+     if(g.stato_nascita_code)el.dataset.birthStateCode=g.stato_nascita_code;
+     if(g.stato_documento_code)el.dataset.issuingStateCode=g.stato_documento_code;
+     if(g.provincia_nascita)el.dataset.birthProvince=g.provincia_nascita;
+   });
+   applyHeadGuestRule();
+   document.getElementById("sendBox").classList.remove("hidden");
+   const btn=[...document.querySelectorAll('button')].find(x=>x.textContent.trim()==="Salva check-in");
+   if(btn)btn.textContent="Aggiorna check-in";
+   show("saveMsg",`Modifica del check-in #${st.id}. Dopo aver corretto i dati premi “Aggiorna check-in”.`);
+   window.scrollTo({top:0,behavior:"smooth"});
+ }catch(e){show("serviceMsg",`Errore nel recupero del soggiorno: ${e.message||e}`)}
+}
+
+async function showHistory(){
+  const box=document.getElementById("historyBox"), list=document.getElementById("historyList");
+  box.classList.remove("hidden"); list.innerHTML="<div class=\"history-empty\">Caricamento storico…</div>";
+  try{
+    const r=await api("/api/history"); const rows=await r.json();
+    if(!rows.length){list.innerHTML="<div class=\"history-empty\">Nessun soggiorno salvato.</div>";return;}
+    list.innerHTML=rows.map(st=>{
+      const guests=(st.guests||[]).map((g,i)=>`${i+1}. ${escHtml(g.cognome||"")} ${escHtml(g.nome||"")} — ${escHtml(g.tipologia||"")}`).join("<br>");
+      const subs=(st.submissions||[]).map(x=>{
+        const ok=x.status==="sent";
+        return `<div class=\"history-sub\"><div class=\"history-head\"><div><strong>${escHtml(x.service)}</strong><div class=\"history-meta\">${escHtml(x.created_at||"")}</div></div><div class=\"history-status ${ok?"ok":"err"}\">${ok?"✓ INVIATO":"✕ ERRORE"}</div></div><div class=\"history-meta\" style=\"margin-top:6px\">${escHtml(x.detail||"")}</div>${x.request_payload?`<details><summary>XML inviato</summary><div class=\"history-code\">${escHtml(x.request_payload)}</div></details>`:""}${x.response_payload?`<details><summary>Risposta ricevuta</summary><div class=\"history-code\">${escHtml(x.response_payload)}</div></details>`:""}</div>`;
+      }).join("");
+      return `<div class=\"history-item\"><div class=\"history-head\"><div><strong>Soggiorno #${st.id}</strong><div class=\"history-meta\">Arrivo: ${escHtml(st.arrival)} · Notti: ${escHtml(st.nights)} · Partenza: ${escHtml(st.departure)}</div></div><div class=\"history-meta\">${escHtml(st.created_at||"")}</div></div><div class=\"history-guests\">${guests}</div><div class=\"history-actions\"><button type=\"button\" onclick=\"modifyRoss(${Number(st.id)},${(st.guests||[]).length})\">Rettifica / recupera ROSS 1000</button></div>${subs||`<div class=\"history-empty\" style=\"margin-top:10px\">Nessuna trasmissione ancora registrata.</div>`}</div>`;
+    }).join("");
+  }catch(e){list.innerHTML=`<div class=\"history-empty\">Errore nel recupero dello storico: ${escHtml(e.message||e)}</div>`;}
+}
 
 document.getElementById("arrival").addEventListener("change",()=>setDepartureFromNights());
 document.getElementById("departure").addEventListener("change",setNightsFromDates);
 document.getElementById("nights").addEventListener("change",setDepartureFromNights);
-if(token){document.getElementById("login").classList.add("hidden");document.getElementById("app").classList.remove("hidden");syncGuests();setDepartureFromNights();loadOfficialLookups().catch(()=>{})}
+if(token){document.getElementById("login").classList.add("hidden");document.getElementById("app").classList.remove("hidden");syncGuests();setDepartureFromNights();loadOfficialLookups().catch(()=>{});showHistory()}
 </script>
 </body></html>
