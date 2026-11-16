@@ -225,7 +225,15 @@ async function buildAlloggiatiRecords(stay){
   const token=await alloggiatiGenerateToken();
   const luoghi=await alloggiatiTable(token,"Luoghi");
   let statiCsv="";
-  try{statiCsv=await fetchOfficialDownload("Stati");}catch(_e){statiCsv=luoghi;}
+  try{
+    statiCsv=await fetchOfficialDownload("Stati");
+  }catch(_e){
+    // Se il download pubblico STATI non è disponibile (ad esempio perché
+    // il portale restituisce un archivio compresso), recuperiamo la tabella
+    // Nazioni direttamente dal Web Service Alloggiati. Non bisogna usare
+    // la tabella Luoghi come fallback: contiene i Comuni e non i Paesi.
+    statiCsv=await alloggiatiTable(token,"Nazioni");
+  }
   const docs=await alloggiatiTable(token,"Tipi_Documento");
   const types=await alloggiatiTable(token,"Tipi_Alloggiato");
   const typeCodes={
@@ -377,25 +385,32 @@ app.post("/api/submit/ross1000/modify/:stayId",async(req,res)=>{
   try{
     if(!process.env.ROSS_USER||!process.env.ROSS_PASSWORD||!process.env.ROSS_STRUCTURE_CODE) throw new Error("ROSS 1000 non configurato: servono ROSS_USER, ROSS_PASSWORD e ROSS_STRUCTURE_CODE.");
 
-    // Se l'ID SWH esiste già ma la data di arrivo è cambiata, ROSS non accetta
-    // una semplice ritrasmissione: il tracciato prevede prima l'eliminazione
-    // del record precedente tramite <rettifiche><eliminazione>, quindi il nuovo arrivo.
+    // Prima proviamo a recuperare la comunicazione dal nostro storico.
     const previous=db.prepare(`SELECT request_payload FROM submissions
       WHERE stay_id=? AND service IN ('ross1000','ross1000-modifica') AND status='sent'
       ORDER BY id DESC LIMIT 1`).get(row.id);
-    const previousArrival=previous?.request_payload ? tag(previous.request_payload,"data") : "";
+    const suppliedArrival=String(req.body?.previousArrival||"").trim();
+    const previousArrival=previous?.request_payload ? tag(previous.request_payload,"data") : suppliedArrival;
     const currentArrival=yyyymmdd(stay.arrival);
+
+    // Se la comunicazione originale non è nel nostro storico, l'operatore può
+    // fornire manualmente la data precedente. Gli idswh possono essere forniti
+    // manualmente; se omessi, usiamo quelli normalmente generati per questo soggiorno.
+    const suppliedIds=Array.isArray(req.body?.previousIdswh)?req.body.previousIdswh.map(x=>String(x||"").trim()):[];
+    const previousIds=previous?.request_payload ? allTags(previous.request_payload,"idswh") : suppliedIds;
+    if(!previousArrival) throw new Error("ROSS 1000: comunicazione precedente non presente nello storico. Inserisci la data di arrivo della comunicazione precedente per generare la rettifica.");
+    if(previousArrival!==currentArrival && previousIds.length===0) throw new Error("ROSS 1000: impossibile generare la rettifica senza gli idswh della comunicazione precedente. Inseriscili nella schermata di recupero.");
 
     let result;
     if(previousArrival && currentArrival && previousArrival!==currentArrival){
-      result=await rossModifyArrival(stay,previousArrival);
+      result=await rossModifyArrival(stay,previousArrival,previousIds);
       result.message=result.ok
-        ? `ROSS 1000: modifica completata. È stato eliminato il movimento precedente del ${previousArrival} e ritrasmesso quello del ${currentArrival}, mantenendo gli stessi idswh.`
+        ? `ROSS 1000: rettifica completata. Eliminato il movimento precedente del ${previousArrival} e trasmesso quello del ${currentArrival}. Gli idswh precedenti sono stati mantenuti.`
         : (result.error||result.message);
     }else{
       result=await rossSend(stay);
       result.message=result.ok
-        ? "ROSS 1000: modifica/ritrasmissione inviata mantenendo gli stessi idswh del soggiorno. Il tracciato prevede la ritrasmissione del movimento del giorno di arrivo per modificare dati già trasmessi."
+        ? "ROSS 1000: modifica/ritrasmissione inviata mantenendo gli stessi idswh del soggiorno."
         : (result.error||result.message);
     }
     saveSubmission(row.id,"ross1000-modifica",result,result.request_xml||"",result.raw||"");
@@ -403,13 +418,13 @@ app.post("/api/submit/ross1000/modify/:stayId",async(req,res)=>{
   }catch(e){
     const detail=String(e.message||e);
     saveSubmission(row.id,"ross1000-modifica",{status:"error",error:detail},"",detail);
-    return res.status(502).json({ok:false,status:"error",error:detail});
+    return res.status(400).json({ok:false,status:"error",error:detail});
   }
 });
 
 function rossXmlEscape(s=""){return xmlEscape(s);}
 
-async function rossModifyArrival(stay, previousArrival){
+async function rossModifyArrival(stay, previousArrival, previousIds=[]){
   const endpoint=process.env.ROSS_ENDPOINT||"https://lazioturismo.ross1000.it/ws/checkinV2";
   const product=process.env.ROSS_PRODUCT||"CheckIn Lazio";
   const tourism=process.env.ROSS_TOURISM_DEFAULT||"Non Specificato";
@@ -432,9 +447,10 @@ async function rossModifyArrival(stay, previousArrival){
     return nationCsv?findCode(nationCsv,v):String(v).trim();
   };
   const rossRecordId=(guestIndex)=>`CL${String(stay.arrival||"").slice(0,4)}${String(stay.id)}-${guestIndex+1}`;
+  const oldRossRecordId=(guestIndex)=>String(previousIds[guestIndex]||rossRecordId(guestIndex));
   const rossTypeCodes={ospite_singolo:"16",capo_famiglia:"17",capo_gruppo:"18",familiare:"19",membro_gruppo:"20"};
   const typeCodeFor=(guestType)=>typeCsv?findCode(typeCsv,guestType==="ospite_singolo"?"Ospite Singolo":guestType==="capo_famiglia"?"Capo Famiglia":guestType==="capo_gruppo"?"Capo Gruppo":guestType==="familiare"?"Familiare":"Membro Gruppo"):(rossTypeCodes[guestType]||"16");
-  const eliminazioni=stay.guests.map((g,i)=>`<eliminazione><idswh>${rossXmlEscape(rossRecordId(i))}</idswh><tipoalloggiato>${typeCodeFor(String(g.tipologia||"ospite_singolo"))}</tipoalloggiato><arrivo>${previousArrival}</arrivo></eliminazione>`).join("");
+  const eliminazioni=stay.guests.map((g,i)=>`<eliminazione><idswh>${rossXmlEscape(oldRossRecordId(i))}</idswh><tipoalloggiato>${typeCodeFor(String(g.tipologia||"ospite_singolo"))}</tipoalloggiato><arrivo>${previousArrival}</arrivo></eliminazione>`).join("");
   const arrivi=stay.guests.map((g,i)=>{
     const guestType=String(g.tipologia||"ospite_singolo");
     const typeCode=typeCodeFor(guestType);
