@@ -28,6 +28,11 @@ CREATE TABLE IF NOT EXISTS submissions (
   response_payload TEXT,
   created_at TEXT NOT NULL
 );
+CREATE TABLE IF NOT EXISTS ross_sequences (
+  id INTEGER PRIMARY KEY CHECK(id=1),
+  next_value INTEGER NOT NULL
+);
+INSERT OR IGNORE INTO ross_sequences(id,next_value) VALUES(1,1);
 
 `);
 
@@ -35,6 +40,36 @@ CREATE TABLE IF NOT EXISTS submissions (
 // conserva anche richiesta e risposta effettivamente trasmesse ai servizi.
 for (const col of ["request_payload", "response_payload"]) {
   try { db.exec(`ALTER TABLE submissions ADD COLUMN ${col} TEXT`); } catch (_) {}
+}
+try { db.exec(`ALTER TABLE stays ADD COLUMN ross_ids_json TEXT`); } catch (_) {}
+
+function allocateRossIds(count, arrival) {
+  const n=Math.max(1,Number(count)||1);
+  const year=String(arrival||new Date().toISOString().slice(0,10)).slice(0,4);
+  const tx=db.transaction(()=>{
+    const row=db.prepare("SELECT next_value FROM ross_sequences WHERE id=1").get();
+    let seq=Math.max(1,Number(row?.next_value||1));
+    // Evita collisioni se il database contiene già soggiorni creati nelle versioni precedenti.
+    const maxStay=Number(db.prepare("SELECT COALESCE(MAX(id),0) AS m FROM stays").get().m||0);
+    if(seq<=maxStay) seq=maxStay+1;
+    const prefix=`CL${year}${seq}`;
+    const ids=Array.from({length:n},(_,i)=>`${prefix}-${i+1}`);
+    db.prepare("UPDATE ross_sequences SET next_value=? WHERE id=1").run(seq+1);
+    return ids;
+  });
+  return tx();
+}
+function ensureRossIds(stay) {
+  let ids=[];
+  try { ids=JSON.parse(stay.ross_ids_json||"[]"); } catch(_) { ids=[]; }
+  if(Array.isArray(ids) && ids.length>=stay.guests.length) return ids.slice(0,stay.guests.length);
+  const missing=Math.max(0,stay.guests.length-ids.length);
+  if(!missing) return ids;
+  const extra=allocateRossIds(missing,stay.arrival);
+  ids=[...ids,...extra];
+  db.prepare("UPDATE stays SET ross_ids_json=? WHERE id=?").run(JSON.stringify(ids),stay.id);
+  stay.ross_ids_json=JSON.stringify(ids);
+  return ids;
 }
 
 app.use(express.json({limit:"10mb"}));
@@ -139,9 +174,10 @@ app.post("/api/stays",(req,res)=>{
   const {arrival,nights,departure,guests}=req.body||{};
   if(!arrival||!departure||!Number.isInteger(Number(nights))||Number(nights)<1||Number(nights)>30||!Array.isArray(guests)||guests.length<1)
     return res.status(400).json({error:"DATI_INCOMPLETI_O_NUOVI_LIMITI"});
-  const info=db.prepare("INSERT INTO stays(arrival,nights,departure,guests_json,created_at) VALUES(?,?,?,?,?)")
-    .run(arrival,Number(nights),departure,JSON.stringify(guests),new Date().toISOString());
-  res.json({ok:true,id:info.lastInsertRowid});
+  const rossIds=allocateRossIds(guests.length,arrival);
+  const info=db.prepare("INSERT INTO stays(arrival,nights,departure,guests_json,created_at,ross_ids_json) VALUES(?,?,?,?,?,?)")
+    .run(arrival,Number(nights),departure,JSON.stringify(guests),new Date().toISOString(),JSON.stringify(rossIds));
+  res.json({ok:true,id:info.lastInsertRowid,ross_ids:rossIds});
 });
 app.put("/api/stays/:id",(req,res)=>{
   const {arrival,nights,departure,guests}=req.body||{};
@@ -186,10 +222,10 @@ function norm(s){return String(s||"").normalize("NFD").replace(/[\u0300-\u036f]/
 
 async function soapCall(action, body){
   const endpoint="https://alloggiatiweb.poliziadistato.it/service/Service.asmx";
-  const envelope=`<?xml version="1.0" encoding="utf-8"?><soap:Envelope xmlns:soap="http://www.w3.org/2003/05/soap-envelope" xmlns:all="AlloggiatiService"><soap:Header/><soap:Body>${body}</soap:Body></soap:Envelope>`;
-  const r=await fetch(endpoint,{method:"POST",headers:{"Content-Type":"application/soap+xml; charset=utf-8","SOAPAction":`AlloggiatiService/${action}`},body:envelope});
+  const envelope=`<?xml version="1.0" encoding="utf-8"?><soap:Envelope xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns:xsd="http://www.w3.org/2001/XMLSchema" xmlns:soap="http://schemas.xmlsoap.org/soap/envelope/"><soap:Header/><soap:Body>${body}</soap:Body></soap:Envelope>`;
+  const r=await fetch(endpoint,{method:"POST",headers:{"Content-Type":"text/xml; charset=utf-8","SOAPAction":`"AlloggiatiService/${action}"`},body:envelope});
   const text=await r.text();
-  if(!r.ok) throw new Error(`Alloggiati HTTP ${r.status}: ${text.slice(0,500)}`);
+  if(!r.ok) throw new Error(`Alloggiati HTTP ${r.status}: ${text.slice(0,1000)}`);
   return text;
 }
 async function alloggiatiGenerateToken(){
@@ -299,7 +335,7 @@ async function buildAlloggiatiRecords(stay){
     if(!isComponent && !numeroDocumento)missing.push("numero documento");
     if(!isComponent && !releaseCode)missing.push(`luogo rilascio (${releaseValue||"vuoto"})`);
     if(missing.length){
-      problems.push(`Ospite ${i+1}: dati/codici mancanti: ${missing.join(", ")}.`); continue;
+      problems.push(`Ospite ${i+1}: dati/codici mancanti: ${missing.join(", ")}. Valori ricevuti: cittadinanza_code=${nationalityCode||"—"}, stato_nascita_code=${birthStateCode||"—"}, tipo_documento_code=${docCode||"—"}, luogo_rilascio_code=${releaseCode||"—"}.`); continue;
     }
     if(birthStateCode==="100000100"&&!birthPlaceCode) problems.push(`Ospite ${i+1}: luogo di nascita "${g.luogo_nascita}" non trovato nella tabella Alloggiati.`);
     const line = fixed(typeCode,2)+fixed(isoToDMY(stay.arrival),10)+fixed(String(stay.nights).padStart(2,"0"),2)+fixed(g.cognome,50)+fixed(g.nome,30)+fixed(sesso,1)+fixed(isoToDMY(g.nascita),10)+fixed(birthStateCode==="100000100"?birthPlaceCode:"",9)+fixed(birthStateCode==="100000100"?(g.provincia_nascita||""):"",2)+fixed(birthStateCode,9)+fixed(nationalityCode,9)+fixed(docCode,5)+fixed(numeroDocumento,20)+fixed(releaseCode,9);
@@ -325,6 +361,19 @@ async function alloggiatiSend(stay){
     ? `<all:GestioneAppartamenti_Send><all:Utente>${xmlEscape(process.env.ALLOGGIATI_USER)}</all:Utente><all:token>${xmlEscape(token)}</all:token><all:ElencoSchedine>${inner}</all:ElencoSchedine><all:IdAppartamento>${xmlEscape(apartmentId)}</all:IdAppartamento></all:GestioneAppartamenti_Send>`
     : `<all:Send><all:Utente>${xmlEscape(process.env.ALLOGGIATI_USER)}</all:Utente><all:token>${xmlEscape(token)}</all:token><all:ElencoSchedine>${inner}</all:ElencoSchedine></all:Send>`;
   const envelope=`<?xml version="1.0" encoding="utf-8"?><soap:Envelope xmlns:soap="http://www.w3.org/2003/05/soap-envelope" xmlns:all="AlloggiatiService"><soap:Header/><soap:Body>${body}</soap:Body></soap:Envelope>`;
+  const testAction=apartmentId?"GestioneAppartamenti_Test":"Test";
+  const testBody=apartmentId
+    ? `<all:GestioneAppartamenti_Test><all:Utente>${xmlEscape(process.env.ALLOGGIATI_USER)}</all:Utente><all:token>${xmlEscape(token)}</all:token><all:ElencoSchedine>${inner}</all:ElencoSchedine><all:IdAppartamento>${xmlEscape(apartmentId)}</all:IdAppartamento></all:GestioneAppartamenti_Test>`
+    : `<all:Test><all:Utente>${xmlEscape(process.env.ALLOGGIATI_USER)}</all:Utente><all:token>${xmlEscape(token)}</all:token><all:ElencoSchedine>${inner}</all:ElencoSchedine></all:Test>`;
+  const testText=await soapCall(testAction,testBody);
+  const testValid=Number(tag(testText,"SchedineValide")||0);
+  const testDetail=allTags(testText,"EsitoOperazioneServizio").map(x=>({esito:tag(x,"esito"),codice:tag(x,"ErroreCod"),descrizione:tag(x,"ErroreDes"),dettaglio:tag(x,"ErroreDettaglio")}));
+  const testGeneral=tag(testText,testAction+"Result")||tag(testText,"TestResult")||tag(testText,"GestioneAppartamenti_TestResult");
+  const testGeneralError=testGeneral?tag(testGeneral,"ErroreDettaglio"):"";
+  if(testValid!==records.length || testDetail.some(x=>String(x.esito).toLowerCase()==="false")){
+    const errors=testDetail.filter(x=>String(x.esito).toLowerCase()!=="true" || x.codice || x.descrizione || x.dettaglio);
+    return {ok:false,status:"error",valid:testValid,total:records.length,detail:errors.length?errors:testDetail,general:{esito:tag(testGeneral,"esito"),errore:testGeneralError},method,test_action:testAction,apartment_id:apartmentId||null,request_xml:envelope,raw:testText.slice(0,10000),validation_only:true};
+  }
   const text=await soapCall(method,body);
   const valid=Number(tag(text,"SchedineValide")||0);
   const detail=allTags(text,"EsitoOperazioneServizio").map(x=>({esito:tag(x,"esito"),codice:tag(x,"ErroreCod"),descrizione:tag(x,"ErroreDes"),dettaglio:tag(x,"ErroreDettaglio")}));
@@ -429,6 +478,13 @@ app.post("/api/submit/ross1000/modify/:stayId",async(req,res)=>{
     if(!previousArrival) throw new Error("ROSS 1000: comunicazione precedente non presente nello storico. Inserisci la data di arrivo della comunicazione precedente per generare la rettifica.");
     if(previousArrival!==currentArrival && previousIds.length===0) throw new Error("ROSS 1000: impossibile generare la rettifica senza gli idswh della comunicazione precedente. Inseriscili nella schermata di recupero.");
 
+    // Se recuperiamo una comunicazione ROSS già inviata, gli idswh originali
+    // diventano gli identificativi persistenti del soggiorno anche per le versioni
+    // precedenti che non li avevano ancora salvati nella colonna ross_ids_json.
+    if(previousIds.length >= stay.guests.length){
+      stay.ross_ids_json=JSON.stringify(previousIds.slice(0,stay.guests.length));
+      db.prepare("UPDATE stays SET ross_ids_json=? WHERE id=?").run(stay.ross_ids_json,stay.id);
+    }
     let result;
     if(previousArrival && currentArrival && previousArrival!==currentArrival){
       result=await rossModifyArrival(stay,previousArrival,previousIds);
@@ -474,7 +530,8 @@ async function rossModifyArrival(stay, previousArrival, previousIds=[]){
     if(/^\d{6,9}$/.test(String(v).trim())) return String(v).trim();
     return nationCsv?findCode(nationCsv,v):String(v).trim();
   };
-  const rossRecordId=(guestIndex)=>`CL${String(stay.arrival||"").slice(0,4)}${String(stay.id)}-${guestIndex+1}`;
+  const rossIds=ensureRossIds(stay);
+  const rossRecordId=(guestIndex)=>String(rossIds[guestIndex]||"").trim();
   const oldRossRecordId=(guestIndex)=>String(previousIds[guestIndex]||rossRecordId(guestIndex));
   const rossTypeCodes={ospite_singolo:"16",capo_famiglia:"17",capo_gruppo:"18",familiare:"19",membro_gruppo:"20"};
   const typeCodeFor=(guestType)=>typeCsv?findCode(typeCsv,guestType==="ospite_singolo"?"Ospite Singolo":guestType==="capo_famiglia"?"Capo Famiglia":guestType==="capo_gruppo"?"Capo Gruppo":guestType==="familiare"?"Familiare":"Membro Gruppo"):(rossTypeCodes[guestType]||"16");
@@ -529,11 +586,12 @@ async function rossSend(stay){
     if(/^\d{6,9}$/.test(String(v).trim())) return String(v).trim();
     return nationCsv?findCode(nationCsv,v):String(v).trim();
   };
-  // ROSS richiede un idswh univoco per ogni record della stessa struttura.
-  // Deve inoltre restare invariato se lo stesso soggiorno viene ritrasmesso.
-  // Usiamo quindi l'ID persistente del soggiorno + anno + indice ospite,
-  // mantenendo il valore entro i 20 caratteri previsti dal tracciato.
-  const rossRecordId=(guestIndex)=>`CL${String(stay.arrival||"").slice(0,4)}${String(stay.id)}-${guestIndex+1}`;
+  // ROSS richiede un idswh univoco per ogni record della struttura.
+  // L'identificativo viene assegnato una sola volta al soggiorno e salvato nel DB,
+  // così non riparte da CL20261-1 dopo un riavvio del processo.
+  // Per un soggiorno con più ospiti: CL20261-1, CL20261-2, ...
+  const rossIds=ensureRossIds(stay);
+  const rossRecordId=(guestIndex)=>String(rossIds[guestIndex]||"").trim();
   const arrivi=stay.guests.map((g,i)=>{
     const guestType=String(g.tipologia||"ospite_singolo");
     const typeCode=typeCsv?findCode(typeCsv,guestType==="ospite_singolo"?"Ospite Singolo":guestType==="capo_famiglia"?"Capo Famiglia":guestType==="capo_gruppo"?"Capo Gruppo":guestType==="familiare"?"Familiare":"Membro Gruppo"):(rossTypeCodes[guestType]||"16");
