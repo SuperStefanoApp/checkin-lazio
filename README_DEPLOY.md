@@ -1,13 +1,30 @@
-# CheckIn Lazio V35 FIXED
+# CheckIn Lazio – V37 Tabelle ufficiali Alloggiati Web
 
-Correzione di packaging della V35: `public/index.html` è stato ripristinato come pagina HTML completa.
+Questa versione mantiene invariata la parte frontend di V37, compresi lettura MRZ, OCR e ICAO.
 
-Il `server.js` mantiene la logica V35 per:
-- Alloggiati Web
-- ROSS 1000
-- progressione persistente degli IDsWH
-- cronologia e payload delle trasmissioni
+## Correzione principale
+- Le tabelle usate per Alloggiati Web vengono recuperate dai download ufficiali della Polizia di Stato:
+  - Comuni
+  - Stati
+  - Tipo Documento
+  - Tipo Alloggiato
+- Il download ufficiale viene gestito sia se restituisce CSV diretto sia se restituisce un archivio ZIP.
+- Le codifiche usate nella generazione del tracciato Alloggiati vengono prese dalle stesse tabelle ufficiali.
+- Per la ricerca dei comuni dell'interfaccia viene usata la tabella ufficiale Alloggiati, non un dataset esterno.
+- È stato eliminato il fallback non documentato verso `Nazioni` nel Web Service Alloggiati.
+- Il Web Service continua a essere usato per autenticazione/token e per le tabelle per cui il manuale ufficiale documenta il metodo `Tabella`.
 
-Il lettore MRZ/OCR/ICAO del frontend non è stato modificato rispetto alla base frontend utilizzata.
+## Environment
+Mantieni le variabili già presenti in Render:
+- ADMIN_USER
+- ADMIN_PASSWORD
+- SESSION_SECRET
+- ALLOGGIATI_USER
+- ALLOGGIATI_PASSWORD
+- ALLOGGIATI_WSKEY
+- ROSS_USER
+- ROSS_PASSWORD
+- ROSS_STRUCTURE_CODE
+- ROSS_ENDPOINT=https://lazioturismo.ross1000.it/ws/checkinV2
 
-Deploy: sostituire i file del repository con quelli presenti in questo archivio e lasciare che Render effettui il deploy.
+Non sono state modificate le funzioni ROSS 1000 né la parte MRZ/OCR/ICAO.
