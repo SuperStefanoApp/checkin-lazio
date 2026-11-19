@@ -1,45 +1,18 @@
-# CheckIn Lazio V37 - Alloggiati + storico + IDSWH ROSS persistente
+# CheckIn Lazio V35
 
-Questa revisione parte dalla V37 e modifica esclusivamente:
-- gestione/invio Alloggiati Web;
-- storico dei check-in e delle trasmissioni;
-- generazione e persistenza degli idswh ROSS 1000.
+V35 include:
+- cronologia persistente dei check-in salvati;
+- cronologia dettagliata delle trasmissioni Alloggiati Web e ROSS 1000;
+- salvataggio della richiesta XML inviata e della risposta ricevuta, per il confronto;
+- possibilità di selezionare uno storico e riutilizzarlo per una nuova trasmissione;
+- pulsante ROSS 1000 “Ritrasmetti/modifica” che mantiene gli stessi `idswh` del soggiorno e ritrasmette il movimento del giorno di arrivo, secondo il tracciato XML ROSS 1000;
+- mantenimento delle correzioni già presenti per MRZ/ICAO, gruppi/famiglie, tabelle ufficiali Alloggiati e campi automatici.
 
-Non modifica il lettore MRZ/OCR.
+## Deploy
 
-## Alloggiati Web
+Sostituire i file del repository con quelli contenuti nello ZIP e lasciare che Render esegua il deploy automatico.
 
-- Il tracciato continua a essere costruito secondo il record ufficiale di 168 caratteri.
-- Prima dell'invio viene eseguito il controllo ufficiale `Test` (oppure `GestioneAppartamenti_Test` se è configurato l'ID appartamento).
-- Se il controllo rileva un errore, il sistema mostra il codice e la descrizione restituiti da Alloggiati invece di tentare l'invio.
-- L'invio effettivo avviene solo se il controllo preliminare è valido.
-- Il codice usa il Web Service ufficiale Alloggiati.
-
-## Storico
-
-La cronologia mantiene:
-- soggiorni e ospiti inseriti;
-- richieste XML;
-- risposte ricevute;
-- esiti delle comunicazioni;
-- modifica/recupero del soggiorno.
-
-## ROSS 1000 - idswh
-
-Gli idswh non sono più ricavati direttamente dall'ID SQLite del soggiorno.
-
-Ogni nuovo soggiorno riceve un progressivo persistente, ad esempio:
-- primo soggiorno con 2 ospiti: `CL20261-1`, `CL20261-2`
-- secondo soggiorno con 2 ospiti: `CL20262-1`, `CL20262-2`
-- terzo soggiorno con 1 ospite: `CL20263-1`
-
-Gli identificativi vengono salvati nella tabella `stays` e vengono riutilizzati nelle ritrasmissioni/modifiche dello stesso soggiorno.
-
-## Persistenza Render
-
-Il database è configurato su `/var/data/checkin.db` tramite disco persistente Render. Questo è necessario affinché il progressivo ROSS e lo storico non ripartano da zero quando il processo viene riavviato o il container viene ricreato.
-
-Le variabili d'ambiente necessarie restano:
+Le variabili d'ambiente già utilizzate restano necessarie:
 - ADMIN_USER
 - ADMIN_PASSWORD
 - SESSION_SECRET
@@ -50,4 +23,5 @@ Le variabili d'ambiente necessarie restano:
 - ROSS_PASSWORD
 - ROSS_STRUCTURE_CODE
 - ROSS_ENDPOINT
-- opzionale: ALLOGGIATI_ID_APPARTAMENTO
+
+Il database SQLite mantiene le tabelle `stays` e `submissions`; V35 aggiunge automaticamente le colonne necessarie alla cronologia senza richiedere una migrazione manuale.

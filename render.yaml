@@ -5,17 +5,11 @@ services:
     plan: starter
     autoDeploy: true
     healthCheckPath: /api/health
-    disk:
-      name: checkin-lazio-data
-      mountPath: /var/data
-      sizeGB: 1
     envVars:
       - key: NODE_ENV
         value: production
       - key: PORT
         value: 3000
-      - key: DB_PATH
-        value: /var/data/checkin.db
       - key: ADMIN_USER
         sync: false
       - key: ADMIN_PASSWORD
@@ -37,5 +31,4 @@ services:
       - key: ROSS_ENDPOINT
         value: https://lazioturismo.ross1000.it/ws/checkinV2
 
-# Per utenze Alloggiati di categoria "Gestione Appartamenti" impostare ALLOGGIATI_ID_APPARTAMENTO
-# con l'ID dell'appartamento presente in Alloggiati Web.
+# Per utenze Alloggiati di categoria "Gestione Appartamenti" impostare l'ID appartamento

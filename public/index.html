@@ -1,81 +1,5 @@
-<!doctype html>
-<html lang="it">
-<head>
-<meta charset="utf-8">
-<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
-<meta name="theme-color" content="#123b5d">
-<link rel="manifest" href="/manifest.json">
-<title>CheckIn Lazio</title>
-<style>
-:root{font-family:system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;color:#163047;background:#f4f7fa}
-*{box-sizing:border-box}body{margin:0}.top{background:#123b5d;color:#fff;padding:18px 20px;position:sticky;top:0;z-index:5}.top h1{margin:0;font-size:22px}.wrap{max-width:900px;margin:0 auto;padding:18px}.card{background:#fff;border-radius:16px;padding:18px;margin-bottom:16px;box-shadow:0 2px 12px #00000012}.grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px}@media(max-width:650px){.grid{grid-template-columns:1fr}}label{font-weight:600;font-size:13px;display:block;margin-bottom:6px}input,button,select{width:100%;padding:12px;border:1px solid #ccd6df;border-radius:10px;font-size:16px;background:#fff;color:#163047}input[readonly]{background:#f2f5f7}button{background:#123b5d;color:#fff;border:0;font-weight:700;cursor:pointer}.secondary{background:#e9eef3;color:#123b5d}.danger{background:#a62929}.guest{border:1px solid #dce4eb;border-radius:12px;padding:14px;margin:12px 0}.row{display:flex;gap:10px;align-items:center}.row>*{flex:1}.status{padding:10px;border-radius:10px;background:#eef5fa;margin-top:12px}.small{font-size:12px;color:#617487}.hidden{display:none}.pill{display:inline-block;padding:5px 9px;border-radius:999px;background:#e9eef3;font-size:12px}.field-wrap{position:relative}.municipality-suggestions{position:absolute;left:0;right:0;top:100%;z-index:20;background:#fff;border:1px solid #ccd6df;border-radius:10px;box-shadow:0 8px 24px #00000018;overflow:hidden}.municipality-suggestions button{display:block;width:100%;text-align:left;background:#fff;color:#163047;border:0;border-radius:0;padding:10px 12px;font-weight:500}.municipality-suggestions button:hover{background:#eef5fa}.municipality-hint{font-size:11px;color:#617487;margin-top:4px}.country-suggestions{position:absolute;left:0;right:0;top:100%;z-index:30;background:#fff;border:1px solid #ccd6df;border-radius:10px;box-shadow:0 8px 24px #00000018;overflow:auto;max-height:280px}.country-suggestions button{display:block;width:100%;text-align:left;background:#fff;color:#163047;border:0;border-radius:0;padding:10px 12px;font-weight:500}.country-suggestions button:hover{background:#eef5fa}.country-suggestions button:active{background:#dfeaf2}
-.document-select-wrap{position:relative}.document-select-button{display:flex;align-items:center;justify-content:space-between;background:#fff;color:#163047;border:1px solid #ccd6df;font-weight:500;text-align:left}.document-select-button span{font-size:20px;line-height:1}.document-type-menu{position:absolute;left:0;right:0;top:100%;z-index:40;background:#fff;border:1px solid #ccd6df;border-radius:10px;box-shadow:0 8px 24px #00000018;overflow:auto;max-height:320px}.document-type-menu button{display:block;width:100%;text-align:left;background:#fff;color:#163047;border:0;border-radius:0;padding:11px 12px;font-weight:500}.document-type-menu button:hover,.document-type-menu button:active{background:#eef5fa}
-#mrzPanel{position:fixed;inset:0;background:#f4f7fa;z-index:1000;display:flex;flex-direction:column;overflow:auto}#mrzPanel.hidden{display:none}.scan-top{background:#123b5d;color:#fff;padding:16px 18px;display:flex;align-items:center;gap:12px;position:sticky;top:0;z-index:2}.scan-top h2{margin:0;font-size:19px;flex:1}.scan-close{width:auto;padding:10px 14px;background:#fff;color:#123b5d}.scan-body{width:100%;max-width:900px;margin:0 auto;padding:16px}.scan-status{margin:0 0 12px}.scan-actions{display:flex;gap:10px;margin-top:12px}.scan-actions button{flex:1}.scan-note{background:#eef5fa;padding:12px;border-radius:10px;margin-top:10px;font-size:13px;color:#40566a}.scan-note strong{color:#123b5d}#mrz-reader{width:100%;max-width:888px;margin:0 auto;border-radius:14px;overflow:hidden;background:#0b1116;min-height:300px}
-.cie-camera{position:relative;width:100%;max-width:900px;margin:0 auto;background:#000;border-radius:14px;overflow:hidden}.cie-camera video{display:block;width:100%;max-height:60vh;object-fit:cover}.cie-guide{position:absolute;left:4%;top:50%;width:92%;aspect-ratio:85.6/54;transform:translateY(-50%);border:3px dashed #43e67b;border-radius:12px;box-shadow:0 0 0 9999px rgba(0,0,0,.28);pointer-events:none}.cie-guide-label{position:absolute;left:0;right:0;top:-34px;text-align:center;color:#fff;font-weight:700;font-size:13px;text-shadow:0 1px 3px #000}.cie-guide-hint{font-size:12px;color:#617487;margin-top:7px}.result-box{margin-top:12px;padding:12px;border-radius:10px;background:#eef8ef;border:1px solid #cde7d0}.warning-box{margin-top:12px;padding:12px;border-radius:10px;background:#fff6e8;border:1px solid #f0d7a8}.history-item{border:1px solid #dce4eb;border-radius:12px;padding:14px;margin:10px 0;background:#fff}.history-head{display:flex;justify-content:space-between;gap:10px;align-items:flex-start}.history-meta{font-size:12px;color:#617487}.history-status{font-weight:700}.history-status.ok{color:#1f7a3a}.history-status.err{color:#a62929}.history-status.partial{color:#9a6b00}.history-guests{margin-top:8px;font-size:13px}.history-sub{margin-top:10px;padding-top:10px;border-top:1px solid #e4e9ee}.history-sub summary{cursor:pointer;font-weight:700;color:#123b5d}.history-code{white-space:pre-wrap;word-break:break-word;background:#f4f7fa;border-radius:8px;padding:10px;font-size:10px;max-height:260px;overflow:auto;margin-top:8px}.history-actions{display:flex;gap:8px;flex-wrap:wrap;margin-top:10px}.history-actions button{width:auto;flex:1;min-width:160px}.history-empty{padding:14px;border-radius:10px;background:#eef5fa;color:#617487}
-</style>
-</head>
-<body>
-<div class="top"><h1>CheckIn Lazio</h1><div class="small" style="color:#d9e7f2">Check-in online • Alloggiati Web • ROSS 1000</div></div>
-<div class="wrap">
-<section id="login" class="card">
-<h2>Accesso</h2>
-<div class="grid"><div><label>Utente</label><input id="user" autocomplete="username"></div><div><label>Password</label><input id="pass" type="password" autocomplete="current-password"></div></div>
-<button style="margin-top:12px" onclick="login()">Accedi</button><div id="loginMsg" class="status hidden"></div>
-</section>
 
-<section id="app" class="hidden">
-<div class="card">
-<h2>Nuovo check-in</h2>
-<div class="grid">
-<div><label>Arrivo</label><input id="arrival" type="date"></div>
-<div><label>Partenza</label><input id="departure" type="date" readonly></div>
-<div><label>Notti</label><input id="nights" type="number" min="1" value="1"></div>
-<div><label>Numero ospiti</label><input id="party" type="number" min="1" value="1" onchange="syncGuests()"></div>
-</div>
-<div class="small" style="margin-top:8px">La partenza è il giorno successivo all'ultima notte: 12/11 + 3 notti = 15/11. La differenza tra arrivo e partenza coincide con il numero di notti.</div>
-<div id="guests"></div>
-<div class="row" style="margin-top:10px"><button class="secondary" onclick="addManual()">+ Inserisci manualmente</button><button onclick="saveStay()">Salva check-in</button></div>
-<div id="saveMsg" class="status hidden"></div>
-</div>
-
-<div class="card">
-<h2>Lettura documento</h2>
-<p class="small"><strong>La scansione è disponibile per ogni ospite.</strong> Premi “Leggi documento” direttamente nella scheda dell'ospite: si aprirà una schermata dedicata alla fotocamera. Al termine della lettura, la schermata si chiude automaticamente e i dati vengono inseriti nell'ospite corretto.</p>
-<div id="docResult" class="hidden"></div>
-</div>
-
-<div id="mrzPanel" class="hidden" aria-modal="true" role="dialog">
-  <div class="scan-top"><h2 id="scanTitle">Scansione documento</h2><button type="button" class="scan-close" onclick="stopMrzScanner()">Chiudi</button></div>
-  <div class="scan-body">
-    <div id="mrzMsg" class="status scan-status hidden"></div>
-    <div id="mrz-reader"></div>
-    <div class="scan-note">Posiziona <strong>la parte inferiore del documento dell'ospite selezionato</strong>, dove sono presenti le 2 o 3 righe composte da lettere, numeri e simboli &lt;, dentro l'area di scansione. Non fotografare semplicemente il documento intero.</div>
-    <div class="scan-actions"><button type="button" class="secondary" onclick="captureMrz()" id="mrzCapture">Leggi MRZ</button><button type="button" class="secondary" onclick="startCieOcr()" id="cieCapture">📷 Acquisisci fronte CIE</button><button type="button" class="secondary" onclick="stopMrzScanner()">Annulla</button></div>
-    <div id="cieOcrBox" class="hidden" style="margin-top:12px"><div class="cie-camera"><video id="cieVideo" playsinline autoplay muted></video><div class="cie-guide"><div class="cie-guide-label">Allinea qui la CIE — fronte intero</div></div></div><div class="cie-guide-hint">La CIE deve riempire quasi tutto il riquadro, essere dritta e senza riflessi. L'app analizzerà separatamente le zone di cognome, nome, nascita e Comune emettitore.</div><canvas id="cieCanvas" class="hidden"></canvas><button type="button" style="margin-top:10px" onclick="captureCieOcr()">Acquisisci e analizza CIE</button><div id="cieOcrMsg" class="status hidden"></div></div>
-  </div>
-</div>
-
-<div class="card">
-<h2>Trasmissioni</h2>
-<div class="row"><button onclick="testService('alloggiati')">Test Alloggiati</button><button onclick="testService('ross1000')">Verifica ROSS 1000</button><button onclick="showHistory()">Storico</button></div><div id="sendBox" class="hidden" style="margin-top:12px"><div class="small">Dopo aver salvato il check-in, puoi inviare i dati ai due servizi separatamente.</div><div class="row" style="margin-top:10px"><button onclick="sendService('alloggiati')">Invia ad Alloggiati Web</button><button onclick="sendService('ross1000')">Invia a ROSS 1000</button></div></div>
-<div id="serviceMsg" class="status hidden"></div>
-<div id="historyBox" style="margin-top:14px">
-  <h3 style="margin:0 0 8px">Cronologia check-in e trasmissioni</h3>
-  <div class="small">Qui vengono conservati i soggiorni salvati e, per ogni invio, la risposta ricevuta dal servizio. In questo modo puoi confrontare ciò che CheckIn Lazio ha trasmesso con l'esito restituito da Alloggiati Web e ROSS 1000.</div>
-  <div id="historyList" style="margin-top:10px"></div>
-</div>
-</div>
-
-<div class="card">
-<h2>Installazione sul telefono</h2>
-<p class="small">Da Safari/Chrome puoi aggiungere questa pagina alla schermata Home. La stessa applicazione può essere usata da più dispositivi, perché il database è sul server.</p>
-</div>
-</section>
-</div>
-
-<script>
 let token=localStorage.getItem("checkin_token")||"";
-let editingStayId=null;
 let mrzReader=null;
 let mrzStarting=false;
 const COUNTRY_NAMES = {"ABW": "Aruba", "AFG": "Afghanistan", "AGO": "Angola", "AIA": "Anguilla", "ALA": "Isole Åland", "ALB": "Albania", "AND": "Andorra", "ARE": "Emirati Arabi Uniti", "ARG": "Argentina", "ARM": "Armenia", "ASM": "Samoa Americane", "ATA": "Antartide", "ATF": "Terre Australi Francesi", "ATG": "Antigua e Barbuda", "AUS": "Australia", "AUT": "Austria", "AZE": "Azerbaigian", "BDI": "Burundi", "BEL": "Belgio", "BEN": "Benin", "BES": "Caraibi Olandesi", "BFA": "Burkina Faso", "BGD": "Bangladesh", "BGR": "Bulgaria", "BHR": "Bahrein", "BHS": "Bahamas", "BIH": "Bosnia ed Erzegovina", "BLM": "Saint-Barthélemy", "BLR": "Bielorussia", "BLZ": "Belize", "BMU": "Bermuda", "BOL": "Bolivia", "BRA": "Brasile", "BRB": "Barbados", "BRN": "Brunei", "BTN": "Bhutan", "BVT": "Isola Bouvet", "BWA": "Botswana", "CAF": "Repubblica Centrafricana", "CAN": "Canada", "CCK": "Isole Cocos (Keeling)", "CHE": "Svizzera", "CHL": "Cile", "CHN": "Cina", "CIV": "Costa d’Avorio", "CMR": "Camerun", "COD": "Congo - Kinshasa", "COG": "Congo-Brazzaville", "COK": "Isole Cook", "COL": "Colombia", "COM": "Comore", "CPV": "Capo Verde", "CRI": "Costa Rica", "CUB": "Cuba", "CUW": "Curaçao", "CXR": "Isola Christmas", "CYM": "Isole Cayman", "CYP": "Cipro", "CZE": "Cechia", "DEU": "Germania", "DJI": "Gibuti", "DMA": "Dominica", "DNK": "Danimarca", "DOM": "Repubblica Dominicana", "DZA": "Algeria", "ECU": "Ecuador", "EGY": "Egitto", "ERI": "Eritrea", "ESH": "Sahara Occidentale", "ESP": "Spagna", "EST": "Estonia", "ETH": "Etiopia", "FIN": "Finlandia", "FJI": "Figi", "FLK": "Isole Falkland", "FRA": "Francia", "FRO": "Isole Fær Øer", "FSM": "Micronesia", "GAB": "Gabon", "GBR": "Regno Unito", "GEO": "Georgia", "GGY": "Guernsey", "GHA": "Ghana", "GIB": "Gibilterra", "GIN": "Guinea", "GLP": "Guadalupa", "GMB": "Gambia", "GNB": "Guinea-Bissau", "GNQ": "Guinea Equatoriale", "GRC": "Grecia", "GRD": "Grenada", "GRL": "Groenlandia", "GTM": "Guatemala", "GUF": "Guyana Francese", "GUM": "Guam", "GUY": "Guyana", "HKG": "RAS di Hong Kong", "HMD": "Isole Heard e McDonald", "HND": "Honduras", "HRV": "Croazia", "HTI": "Haiti", "HUN": "Ungheria", "IDN": "Indonesia", "IMN": "Isola di Man", "IND": "India", "IOT": "Territorio Britannico dell’Oceano Indiano", "IRL": "Irlanda", "IRN": "Iran", "IRQ": "Iraq", "ISL": "Islanda", "ISR": "Israele", "ITA": "Italia", "JAM": "Giamaica", "JEY": "Jersey", "JOR": "Giordania", "JPN": "Giappone", "KAZ": "Kazakistan", "KEN": "Kenya", "KGZ": "Kirghizistan", "KHM": "Cambogia", "KIR": "Kiribati", "KNA": "Saint Kitts e Nevis", "KOR": "Corea del Sud", "KWT": "Kuwait", "LAO": "Laos", "LBN": "Libano", "LBR": "Liberia", "LBY": "Libia", "LCA": "Saint Lucia", "LIE": "Liechtenstein", "LKA": "Sri Lanka", "LSO": "Lesotho", "LTU": "Lituania", "LUX": "Lussemburgo", "LVA": "Lettonia", "MAC": "RAS di Macao", "MAF": "Saint Martin", "MAR": "Marocco", "MCO": "Monaco", "MDA": "Moldavia", "MDG": "Madagascar", "MDV": "Maldive", "MEX": "Messico", "MHL": "Isole Marshall", "MKD": "Macedonia del Nord", "MLI": "Mali", "MLT": "Malta", "MMR": "Myanmar (Birmania)", "MNE": "Montenegro", "MNG": "Mongolia", "MNP": "Isole Marianne Settentrionali", "MOZ": "Mozambico", "MRT": "Mauritania", "MSR": "Montserrat", "MTQ": "Martinica", "MUS": "Mauritius", "MWI": "Malawi", "MYS": "Malaysia", "MYT": "Mayotte", "NAM": "Namibia", "NCL": "Nuova Caledonia", "NER": "Niger", "NFK": "Isola Norfolk", "NGA": "Nigeria", "NIC": "Nicaragua", "NIU": "Niue", "NLD": "Paesi Bassi", "NOR": "Norvegia", "NPL": "Nepal", "NRU": "Nauru", "NZL": "Nuova Zelanda", "OMN": "Oman", "PAK": "Pakistan", "PAN": "Panama", "PCN": "Isole Pitcairn", "PER": "Perù", "PHL": "Filippine", "PLW": "Palau", "PNG": "Papua Nuova Guinea", "POL": "Polonia", "PRI": "Portorico", "PRK": "Corea del Nord", "PRT": "Portogallo", "PRY": "Paraguay", "PSE": "Territori Palestinesi", "PYF": "Polinesia Francese", "QAT": "Qatar", "REU": "Riunione", "ROU": "Romania", "RUS": "Russia", "RWA": "Ruanda", "SAU": "Arabia Saudita", "SDN": "Sudan", "SEN": "Senegal", "SGP": "Singapore", "SGS": "Georgia del Sud e Sandwich Australi", "SHN": "Sant’Elena", "SJM": "Svalbard e Jan Mayen", "SLB": "Isole Salomone", "SLE": "Sierra Leone", "SLV": "El Salvador", "SMR": "San Marino", "SOM": "Somalia", "SPM": "Saint-Pierre e Miquelon", "SRB": "Serbia", "SSD": "Sud Sudan", "STP": "São Tomé e Príncipe", "SUR": "Suriname", "SVK": "Slovacchia", "SVN": "Slovenia", "SWE": "Svezia", "SWZ": "Eswatini", "SXM": "Sint Maarten", "SYC": "Seychelles", "SYR": "Siria", "TCA": "Isole Turks e Caicos", "TCD": "Ciad", "TGO": "Togo", "THA": "Thailandia", "TJK": "Tagikistan", "TKL": "Tokelau", "TKM": "Turkmenistan", "TLS": "Timor Est", "TON": "Tonga", "TTO": "Trinidad e Tobago", "TUN": "Tunisia", "TUR": "Turchia", "TUV": "Tuvalu", "TWN": "Taiwan", "TZA": "Tanzania", "UGA": "Uganda", "UKR": "Ucraina", "UMI": "Isole Minori Esterne degli Stati Uniti", "URY": "Uruguay", "USA": "Stati Uniti", "UZB": "Uzbekistan", "VAT": "Città del Vaticano", "VCT": "Saint Vincent e Grenadine", "VEN": "Venezuela", "VGB": "Isole Vergini Britanniche", "VIR": "Isole Vergini Americane", "VNM": "Vietnam", "VUT": "Vanuatu", "WLF": "Wallis e Futuna", "WSM": "Samoa", "XKX": "Kosovo", "YEM": "Yemen", "ZAF": "Sudafrica", "ZMB": "Zambia", "ZWE": "Zimbabwe"};
@@ -182,7 +106,7 @@ function renderDocumentTypeControls(){
 }
 async function loadOfficialLookups(){await Promise.all([loadOfficialCountries(),loadOfficialGuestTypes(),loadOfficialDocumentTypes()]);}
 
-async function login(){const r=await fetch("/api/login",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({username:user.value,password:pass.value})});const j=await r.json();if(j.ok){token=j.token;localStorage.setItem("checkin_token",token);document.getElementById("login").classList.add("hidden");document.getElementById("app").classList.remove("hidden");syncGuests();setDepartureFromNights();loadOfficialLookups().catch(()=>{});showHistory()}else show("loginMsg",j.error||"Accesso negato")}
+async function login(){const r=await fetch("/api/login",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({username:user.value,password:pass.value})});const j=await r.json();if(j.ok){token=j.token;localStorage.setItem("checkin_token",token);document.getElementById("login").classList.add("hidden");document.getElementById("app").classList.remove("hidden");syncGuests();setDepartureFromNights();loadOfficialLookups().catch(()=>{})}else show("loginMsg",j.error||"Accesso negato")}
 
 // Date handling deliberately avoids toISOString(), which converts midnight to UTC and
 // can shift an Italian calendar date back by one day.
@@ -405,42 +329,21 @@ function handlePlaceBlur(index,kind){
 function collectGuests(){
  return [...document.querySelectorAll(".guest")].map(g=>{
    const o=Object.fromEntries([...g.querySelectorAll("[data-f]")].map(x=>[x.dataset.f,x.value]));
-   const citCode=g.querySelector('[data-f="cittadinanza"]')?.dataset.countryCode||g.querySelector('[data-f="cittadinanza_code"]')?.value||"";
-   if(citCode) o.cittadinanza_code=String(citCode).trim();
+   if(o.cittadinanza_code) o.cittadinanza_code=String(o.cittadinanza_code).trim();
    if(g.dataset.birthStateCode) o.stato_nascita_code=String(g.dataset.birthStateCode).trim();
    if(g.dataset.issuingStateCode) o.stato_documento_code=String(g.dataset.issuingStateCode).trim();
-   const birth=g.querySelector('[data-f="luogo_nascita"]');
-   const issue=g.querySelector('[data-f="luogo_rilascio_documento"]');
-   if(birth?.dataset.municipalityCode) o.luogo_nascita_code=String(birth.dataset.municipalityCode).trim();
-   if(issue?.dataset.municipalityCode) o.luogo_rilascio_documento_code=String(issue.dataset.municipalityCode).trim();
-   if(issue?.dataset.countryCode) o.stato_documento_code=String(issue.dataset.countryCode).trim();
-   const doc=g.querySelector('[data-f="tipo_documento"]');
-   if(doc?.dataset.documentCode) o.tipo_documento_code=String(doc.dataset.documentCode).trim();
+   if(g.dataset.birthMunicipality) o.luogo_nascita=String(g.dataset.birthMunicipality).trim();
+   if(g.dataset.issuingMunicipality) o.luogo_rilascio_documento=String(g.dataset.issuingMunicipality).trim();
    if(o.cittadinanza && isItalianNationality(o.cittadinanza)){
-     o.provincia_nascita=String(g.dataset.birthProvince||birth?.dataset.municipalityProvince||"").toUpperCase();
+     o.provincia_nascita=String(g.dataset.birthProvince||g.querySelector('[data-f="luogo_nascita"]')?.dataset.municipalityProvince||"").toUpperCase();
    }
+   // I campi documento degli ospiti successivi sono nascosti nell'interfaccia,
+   // ma restano necessari per Alloggiati Web quando il documento è stato letto.
+   // Non eliminarli dalla struttura dati: sono valorizzati dai dati MRZ/OCR.
    return o;
  });
 }
-async function saveStay(){
- setNightsFromDates();
- if(!arrival.value||!departure.value||Number(nights.value)<1){show("saveMsg","Controlla arrivo e partenza: la partenza deve essere successiva all'arrivo.");return}
- const gs=collectGuests();
- const payload={arrival:arrival.value,nights:Number(nights.value),departure:departure.value,guests:gs};
- const url=editingStayId?`/api/stays/${editingStayId}`:"/api/stays";
- const method=editingStayId?"PUT":"POST";
- const r=await api(url,{method,body:JSON.stringify(payload)});
- const j=await r.json();
- show("saveMsg",j.ok?(editingStayId?`Check-in #${editingStayId} aggiornato.`:`Check-in salvato. ID ${j.id}`):(j.error||"Errore"));
- if(j.ok){
-   window.lastStayId=j.id||editingStayId;
-   editingStayId=null;
-   document.getElementById("sendBox").classList.remove("hidden");
-   const btn=[...document.querySelectorAll('button')].find(x=>x.textContent.trim()==="Aggiorna check-in");
-   if(btn)btn.textContent="Salva check-in";
-   showHistory();
- }
-}
+async function saveStay(){setNightsFromDates();if(!arrival.value||!departure.value||Number(nights.value)<1){show("saveMsg","Controlla arrivo e partenza: la partenza deve essere successiva all'arrivo.");return}const gs=collectGuests();const r=await api("/api/stays",{method:"POST",body:JSON.stringify({arrival:arrival.value,nights:Number(nights.value),departure:departure.value,guests:gs})});const j=await r.json();show("saveMsg",j.ok?`Check-in salvato. ID ${j.id}`:(j.error||"Errore")); if(j.ok){document.getElementById("sendBox").classList.remove("hidden");window.lastStayId=j.id}}
 
 function mrzDate(v){if(!/^[0-9]{6}$/.test(v))return "";const yy=Number(v.slice(0,2)),mm=v.slice(2,4),dd=v.slice(4,6);const year=yy>=50?1900+yy:2000+yy;return `${year}-${mm}-${dd}`}
 
@@ -461,136 +364,27 @@ function mrzRawLines(raw){
  const lines=s.split(/\n+/).map(x=>x.trim()).filter(Boolean);
  return lines;
 }
-
-function normalizeMrzGlyphs(v){
- return String(v||"")
-   .toUpperCase()
-   .replace(/[‹›«»﹤﹥＜＞≤≥≪≫]/g,"<")
-   .replace(/[–—−]/g,"-");
-}
-
 function repairMrzSeparators(raw){
  const lines=mrzRawLines(raw);
  if(!lines.length)return "";
- const cleaned=lines.map(normalizeMrzGlyphs);
- // MRZ engines/OCR sometimes return visually similar glyphs or ordinary spaces
- // instead of the ICAO filler character '<'. For the fixed-width name field,
- // spaces are safe to repair because the ICAO MRZ itself never contains spaces.
+ // OCR engines sometimes return visually similar glyphs instead of the MRZ filler '<'.
+ const fixFillers=v=>String(v||"").replace(/[‹›«»﹤﹥＜＞≤≥≪≫]/g,"<").replace(/[=]/g,"<");
+ const cleaned=lines.map(fixFillers);
+ // The name field is the only MRZ area where '<' carries semantic meaning:
+ // one separator between surname/given-name sections and additional fillers between names.
+ // If OCR emits spaces there, convert them to the MRZ filler character.
  if(cleaned.length===2 && cleaned[0].length>=44){
    const name=cleaned[0].slice(5,44).replace(/\s+/g,"<");
    cleaned[0]=cleaned[0].slice(0,5)+name;
  }else if(cleaned.length===2 && cleaned[0].length>=36){
-   const name=cleaned[0].slice(5,36).replace(/\s+/g,"<");
-   cleaned[0]=cleaned[0].slice(0,5)+name;
- }else if(cleaned.length>=3 && cleaned[2].length>=20){
-   cleaned[2]=cleaned[2].replace(/\s+/g,"<");
+   const name=cleaned[0].slice(2,36).replace(/\s+/g,"<");
+   cleaned[0]=cleaned[0].slice(0,2)+name;
+ }else if(cleaned.length>=3 && cleaned[0].length>=30){
+   const name=cleaned[2].replace(/\s+/g,"<");
+   cleaned[2]=name;
  }
  return cleaned.join("\n");
 }
-
-function extractMrzCandidates(raw){
- const original=mrzRawLines(raw).map(normalizeMrzGlyphs);
- const repaired=repairMrzSeparators(raw).split(/\n+/).filter(Boolean);
- const all=[...original,...repaired].filter(Boolean);
- const unique=[];
- for(const line of all){
-   const compact=line.replace(/\s+/g,"");
-   if(compact.length>=25 && !unique.includes(line))unique.push(line);
- }
- return unique;
-}
-
-function parseIcaoNameField(nameField){
- let f=normalizeMrzGlyphs(nameField);
- // Keep a copy with OCR whitespace: if the OCR lost one/both '<' characters,
- // a run of two or more spaces can still reveal the ICAO surname/name boundary.
- const spaced=f.replace(/[=]/g,"<");
- f=f.replace(/\s+/g,"<");
- const sep=f.indexOf("<<");
- if(sep>=0){
-   const surname=f.slice(0,sep).replace(/<+/g," ").trim();
-   const given=f.slice(sep+2).replace(/<+/g," ").trim();
-   if(surname&&given)return {surname,given,confidence:"icao"};
- }
- const spaceBoundary=spaced.match(/\s{2,}/);
- if(spaceBoundary && spaceBoundary.index!=null){
-   const surname=spaced.slice(0,spaceBoundary.index).replace(/[<]+/g," ").trim();
-   const given=spaced.slice(spaceBoundary.index+spaceBoundary[0].length).replace(/[<]+/g," ").trim();
-   if(surname&&given)return {surname,given,confidence:"ocr-space-boundary"};
- }
- return null;
-}
-
-
-function icaoCheckDigit(field){
- const weights=[7,3,1];
- let sum=0;
- for(let i=0;i<String(field||"").length;i++){
-   const c=String(field[i]).toUpperCase();
-   let v=0;
-   if(/[0-9]/.test(c))v=Number(c);
-   else if(/[A-Z]/.test(c))v=c.charCodeAt(0)-55;
-   else if(c==="<")v=0;
-   else return null;
-   sum+=v*weights[i%3];
- }
- return sum%10;
-}
-function icaoFieldCheck(field,check){
- const d=icaoCheckDigit(field);
- return d!=null && String(check||"")===String(d);
-}
-
-function parseIcaoMrz(raw){
- const lines=extractMrzCandidates(raw);
- // TD3 passport: line 1 contains the ICAO name field at positions 6-44.
- // We can safely extract surname/given names even if the OCR returned only
- // the first MRZ line; the second line is needed only for the fixed data fields.
- let l1=lines.find(x=>/^P</.test(x)&&x.replace(/\s+/g,"").length>=30);
- let l2=l1?lines.find(x=>x!==l1&&x.replace(/\s+/g,"").length>=36):null;
- if(l1){
-   const compact1=l1.replace(/\s+/g,"");
-   // A passport TD3 normally has 44 chars. OCR can occasionally lose one or
-   // more trailing filler characters, so lengths in the low 40s are still
-   // treated as TD3 and the available name field is parsed as-is.
-   const isTd3=l1.length>=44 || compact1.length>=40;
-   const nameSource=normalizeMrzGlyphs(l1);
-   const nameField=nameSource.slice(5,isTd3?Math.min(44,nameSource.length):36);
-   const names=parseIcaoNameField(nameField);
-   if(names){
-     if(l2 && isTd3){
-       l1=compact1.padEnd(44,"<").slice(0,44);
-       l2=l2.replace(/\s+/g,"").padEnd(44,"<").slice(0,44);
-       const docField=l2.slice(0,9);
-       const birthField=l2.slice(13,19);
-       const expiryField=l2.slice(21,27);
-       return {format:"TD3",lines:[l1,l2],name:names,documentNumber:docField.replace(/<+/g,""),nationality:l2.slice(10,13).replace(/<+/g,""),birthDate:birthField,gender:l2.slice(20,21),expiryDate:expiryField,issuingCountry:l1.slice(2,5).replace(/<+/g,""),checks:{document:icaoFieldCheck(docField,l2[9]),birth:icaoFieldCheck(birthField,l2[19]),expiry:icaoFieldCheck(expiryField,l2[27])}};
-     }
-     return {format:isTd3?"TD3":"TD2",lines:[compact1],name:names,issuingCountry:compact1.slice(2,5).replace(/<+/g,"")};
-   }
- }
- return null;
-}
-
-function parsePassportMrzNames(raw){
- const parsed=parseIcaoMrz(raw);
- if(parsed?.name?.surname&&parsed?.name?.given){
-   return {surname:parsed.name.surname,given:parsed.name.given};
- }
- // Conservative fallback for a partially recognized passport line.
- const lines=mrzRawLines(repairMrzSeparators(raw)).map(x=>x.replace(/\s+$/g,""));
- const line1=lines.find(x=>/^P</i.test(x));
- if(!line1) return null;
- let nameField=line1.length>=44 ? line1.slice(5,44) : line1.slice(5,36);
- nameField=normalizeMrzGlyphs(nameField).replace(/\s+/g,"<");
- const sep=nameField.indexOf("<<");
- if(sep<0)return null;
- const surname=nameField.slice(0,sep).replace(/<+/g," ").trim();
- const given=nameField.slice(sep+2).replace(/<+/g," ").trim();
- if(!surname||!given)return null;
- return {surname,given};
-}
-
 function mrzParsedScore(p){
  if(!p||typeof p!=="object")return -1;
  let score=0;
@@ -620,29 +414,6 @@ async function applyMrzResult(result){
    }
  }catch(e){}
  const g=getGuest(activeGuestIndex); if(!g) return false;
- // For passports, use the ICAO name separators as the authoritative fallback.
- // This fixes OCR cases where the MRZ library reads the surname/given-name
- // boundary incorrectly even though the raw MRZ contains the correct << marker.
- const nameFallback=parsePassportMrzNames(result?.raw);
- const icao=parseIcaoMrz(result?.raw);
- if(nameFallback){
-   p={...p,Surname:nameFallback.surname,"Given Names":nameFallback.given};
- }
- // When the raw MRZ is structurally recognizable, use the ICAO fixed-position
- // fields as an additional source of truth. The library remains responsible
- // for validation, while ICAO parsing repairs OCR mistakes in separators and
- // field boundaries.
- if(icao){
-   p={...p,
-     ...(icao.name?.surname?{Surname:icao.name.surname}:{}),
-     ...(icao.name?.given?{"Given Names":icao.name.given}:{}),
-     ...(icao.documentNumber && (icao.checks?.document!==false)?{"Passport Number":icao.documentNumber,"Document Number":icao.documentNumber}:{}),
-     ...(icao.nationality?{Nationality:icao.nationality}:{}),
-     ...(icao.birthDate && (icao.checks?.birth!==false)?{"Date of Birth":icao.birthDate}:{}),
-     ...(icao.gender?{Gender:icao.gender}:{}),
-     ...(icao.issuingCountry?{"Issuing Country":icao.issuingCountry}:{})
-   };
- }
  const get=(...keys)=>{for(const k of keys){if(p[k]!=null&&String(p[k]).trim()!=="")return String(p[k]).trim()}return ""};
  const sex=get("Gender");
  const nationality=countryName(get("Nationality"));
@@ -893,76 +664,49 @@ async function sendService(service){
  }catch(e){show("serviceMsg",`Errore di comunicazione: ${e.message||e}`)}
 }
 
-function escHtml(v){return String(v??"").replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/"/g,"&quot;").replace(/'/g,"&#39;");}
-async function modifyRoss(stayId,guestCount){
-  const previousArrival=prompt("Data di arrivo della comunicazione precedente ROSS 1000 (formato AAAA-MM-GG):","");
-  if(!previousArrival)return;
-  const ids=[];
-  for(let i=0;i<guestCount;i++){
-    const v=prompt(`IDSWH precedente dell'ospite ${i+1}.\nSe ROSS ti ha mostrato un ID come CL20261-1, inseriscilo esattamente così:`,i===0?"CL20261-1":"");
-    if(!v){show("serviceMsg","Rettifica annullata: manca l'IDSWH precedente dell'ospite "+(i+1)+".");return;}
-    ids.push(v.trim());
-  }
-  show("serviceMsg","Recupero comunicazione precedente e invio rettifica ROSS 1000 in corso…");
-  try{
-    const r=await api(`/api/submit/ross1000/modify/${stayId}`,{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({previousArrival:previousArrival.replaceAll("-","").trim(),previousIdswh:ids})});
-    const j=await r.json();
-    show("serviceMsg",j.ok?(j.message||"ROSS 1000: rettifica inviata."):(j.error||"ROSS 1000: rettifica non riuscita."));
-    if(j.ok) showHistory();
-  }catch(e){show("serviceMsg",`Errore di comunicazione: ${e.message||e}`)}
+function escHtml(v){return String(v??"").replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/"/g,"&quot;").replace(/'/g,"&#039;");}
+function historyStatusLabel(s){
+ const x=String(s||"");
+ if(x==="sent")return {t:"Inviato",c:"ok"};
+ if(x==="partial")return {t:"Parzialmente accettato",c:"partial"};
+ if(x==="error")return {t:"Errore",c:"err"};
+ return {t:x||"N/D",c:""};
 }
-async function editStay(stayId){
- try{
-   const r=await api(`/api/stays/${stayId}`);
-   const st=await r.json();
-   if(!r.ok)throw new Error(st.error||"Impossibile recuperare il soggiorno");
-   editingStayId=Number(st.id);
-   arrival.value=st.arrival||""; nights.value=st.nights||1; departure.value=st.departure||"";
-   party.value=(st.guests||[]).length||1; syncGuests();
-   (st.guests||[]).forEach((g,i)=>{
-     const el=getGuest(i);if(!el)return;
-     for(const [k,v] of Object.entries(g||{})){const f=el.querySelector(`[data-f="${k}"]`);if(f&&v!=null)f.value=v;}
-     const cit=el.querySelector('[data-f="cittadinanza"]');
-     if(cit&&g.cittadinanza_code){cit.dataset.countrySelected="1";cit.dataset.countryCode=g.cittadinanza_code;}
-     const doc=el.querySelector('[data-f="tipo_documento"]');
-     if(doc&&g.tipo_documento_code)doc.dataset.documentCode=g.tipo_documento_code;
-     const birth=el.querySelector('[data-f="luogo_nascita"]');
-     if(birth&&g.luogo_nascita_code){birth.dataset.municipalitySelected="1";birth.dataset.municipalityCode=g.luogo_nascita_code;birth.dataset.municipalityProvince=g.provincia_nascita||"";}
-     const issue=el.querySelector('[data-f="luogo_rilascio_documento"]');
-     if(issue&&g.luogo_rilascio_documento_code){issue.dataset.municipalitySelected="1";issue.dataset.municipalityCode=g.luogo_rilascio_documento_code;}
-     if(g.stato_nascita_code)el.dataset.birthStateCode=g.stato_nascita_code;
-     if(g.stato_documento_code)el.dataset.issuingStateCode=g.stato_documento_code;
-     if(g.provincia_nascita)el.dataset.birthProvince=g.provincia_nascita;
-   });
-   applyHeadGuestRule();
-   document.getElementById("sendBox").classList.remove("hidden");
-   const btn=[...document.querySelectorAll('button')].find(x=>x.textContent.trim()==="Salva check-in");
-   if(btn)btn.textContent="Aggiorna check-in";
-   show("saveMsg",`Modifica del check-in #${st.id}. Dopo aver corretto i dati premi “Aggiorna check-in”.`);
-   window.scrollTo({top:0,behavior:"smooth"});
- }catch(e){show("serviceMsg",`Errore nel recupero del soggiorno: ${e.message||e}`)}
-}
-
 async function showHistory(){
-  const box=document.getElementById("historyBox"), list=document.getElementById("historyList");
-  box.classList.remove("hidden"); list.innerHTML="<div class=\"history-empty\">Caricamento storico…</div>";
-  try{
-    const r=await api("/api/history"); const rows=await r.json();
-    if(!rows.length){list.innerHTML="<div class=\"history-empty\">Nessun soggiorno salvato.</div>";return;}
-    list.innerHTML=rows.map(st=>{
-      const guests=(st.guests||[]).map((g,i)=>`${i+1}. ${escHtml(g.cognome||"")} ${escHtml(g.nome||"")} — ${escHtml(g.tipologia||"")}`).join("<br>");
-      const subs=(st.submissions||[]).map(x=>{
-        const ok=x.status==="sent";
-        return `<div class=\"history-sub\"><div class=\"history-head\"><div><strong>${escHtml(x.service)}</strong><div class=\"history-meta\">${escHtml(x.created_at||"")}</div></div><div class=\"history-status ${ok?"ok":"err"}\">${ok?"✓ INVIATO":"✕ ERRORE"}</div></div><div class=\"history-meta\" style=\"margin-top:6px\">${escHtml(x.detail||"")}</div>${x.request_payload?`<details><summary>XML inviato</summary><div class=\"history-code\">${escHtml(x.request_payload)}</div></details>`:""}${x.response_payload?`<details><summary>Risposta ricevuta</summary><div class=\"history-code\">${escHtml(x.response_payload)}</div></details>`:""}</div>`;
-      }).join("");
-      return `<div class=\"history-item\"><div class=\"history-head\"><div><strong>Soggiorno #${st.id}</strong><div class=\"history-meta\">Arrivo: ${escHtml(st.arrival)} · Notti: ${escHtml(st.nights)} · Partenza: ${escHtml(st.departure)}</div></div><div class=\"history-meta\">${escHtml(st.created_at||"")}</div></div><div class=\"history-guests\">${guests}</div><div class=\"history-actions\"><button type=\"button\" onclick=\"modifyRoss(${Number(st.id)},${(st.guests||[]).length})\">Rettifica / recupera ROSS 1000</button></div>${subs||`<div class=\"history-empty\" style=\"margin-top:10px\">Nessuna trasmissione ancora registrata.</div>`}</div>`;
-    }).join("");
-  }catch(e){list.innerHTML=`<div class=\"history-empty\">Errore nel recupero dello storico: ${escHtml(e.message||e)}</div>`;}
+ const box=document.getElementById("historyBox"),list=document.getElementById("historyList");
+ box.classList.remove("hidden"); list.innerHTML="<div class='status'>Caricamento cronologia…</div>";
+ try{
+   const r=await api("/api/history"); const rows=await r.json();
+   if(!Array.isArray(rows)||!rows.length){list.innerHTML="<div class='history-empty'>Nessun check-in salvato.</div>";return;}
+   list.innerHTML=rows.map(st=>{
+     const guests=(st.guests||[]).map((g,i)=>`${i+1}. ${escHtml(g.cognome||"")} ${escHtml(g.nome||"")} — ${escHtml(g.tipologia||"ospite_singolo")}`).join("<br>");
+     const subs=(st.submissions||[]).map(sub=>{
+       const hs=historyStatusLabel(sub.status);
+       const svc=sub.service==="alloggiati"?"Alloggiati Web":sub.service==="ross1000"?"ROSS 1000":"ROSS 1000 — modifica/ritrasmissione";
+       return `<div class="history-sub"><div><strong>${escHtml(svc)}</strong> — <span class="history-status ${hs.c}">${escHtml(hs.t)}</span></div><div class="history-meta">${escHtml(new Date(sub.created_at).toLocaleString("it-IT"))}</div>${sub.detail?`<details><summary>Esito e dettagli ricevuti</summary><div class="history-code">${escHtml(sub.detail)}</div></details>`:""}${sub.request_payload?`<details><summary>XML effettivamente inviato</summary><div class="history-code">${escHtml(sub.request_payload)}</div></details>`:""}${sub.response_payload?`<details><summary>Risposta grezza del portale</summary><div class="history-code">${escHtml(sub.response_payload)}</div></details>`:""}</div>`;
+     }).join("") || `<div class="history-meta" style="margin-top:8px">Nessuna trasmissione ancora effettuata.</div>`;
+     return `<div class="history-item"><div class="history-head"><div><strong>Check-in #${st.id}</strong><div class="history-meta">Arrivo: ${escHtml(st.arrival)} · Partenza: ${escHtml(st.departure)} · Notti: ${escHtml(st.nights)}</div></div><div class="history-meta">Salvato: ${escHtml(new Date(st.created_at).toLocaleString("it-IT"))}</div></div><div class="history-guests">${guests}</div><div class="history-actions"><button class="secondary" type="button" onclick="useStayForTransmission(${st.id})">Usa questo check-in</button><button class="secondary" type="button" onclick="modifyRossFromHistory(${st.id})">Ritrasmetti/modifica ROSS 1000</button></div>${subs}</div>`;
+   }).join("");
+ }catch(e){list.innerHTML=`<div class="warning-box">Errore nel caricamento della cronologia: ${escHtml(e.message||e)}</div>`;}
+}
+async function useStayForTransmission(id){
+ window.lastStayId=id;
+ document.getElementById("sendBox").classList.remove("hidden");
+ show("serviceMsg",`Check-in #${id} selezionato. Ora puoi inviare nuovamente i dati ai servizi.`);
+ window.scrollTo({top:document.body.scrollHeight,behavior:"smooth"});
+}
+async function modifyRossFromHistory(id){
+ if(!confirm("Vuoi ritrasmettere a ROSS 1000 questo check-in come modifica, mantenendo gli stessi identificativi idswh?"))return;
+ show("serviceMsg","ROSS 1000: invio della modifica in corso…");
+ try{
+   const r=await api(`/api/submit/ross1000/modify/${id}`,{method:"POST"});
+   const j=await r.json();
+   show("serviceMsg",j.ok?(j.message||"ROSS 1000: modifica inviata."):(j.error||j.detail||"ROSS 1000: modifica non riuscita."));
+   await showHistory();
+ }catch(e){show("serviceMsg",`Errore di comunicazione: ${e.message||e}`)}
 }
 
 document.getElementById("arrival").addEventListener("change",()=>setDepartureFromNights());
 document.getElementById("departure").addEventListener("change",setNightsFromDates);
 document.getElementById("nights").addEventListener("change",setDepartureFromNights);
-if(token){document.getElementById("login").classList.add("hidden");document.getElementById("app").classList.remove("hidden");syncGuests();setDepartureFromNights();loadOfficialLookups().catch(()=>{});showHistory()}
-</script>
-</body></html>
+if(token){document.getElementById("login").classList.add("hidden");document.getElementById("app").classList.remove("hidden");syncGuests();setDepartureFromNights();loadOfficialLookups().catch(()=>{})}

@@ -28,11 +28,6 @@ CREATE TABLE IF NOT EXISTS submissions (
   response_payload TEXT,
   created_at TEXT NOT NULL
 );
-CREATE TABLE IF NOT EXISTS ross_sequences (
-  id INTEGER PRIMARY KEY CHECK(id=1),
-  next_value INTEGER NOT NULL
-);
-INSERT OR IGNORE INTO ross_sequences(id,next_value) VALUES(1,1);
 
 `);
 
@@ -41,44 +36,35 @@ INSERT OR IGNORE INTO ross_sequences(id,next_value) VALUES(1,1);
 for (const col of ["request_payload", "response_payload"]) {
   try { db.exec(`ALTER TABLE submissions ADD COLUMN ${col} TEXT`); } catch (_) {}
 }
-try { db.exec(`ALTER TABLE stays ADD COLUMN ross_ids_json TEXT`); } catch (_) {}
 
-function allocateRossIds(count, arrival) {
-  const n=Math.max(1,Number(count)||1);
-  const year=String(arrival||new Date().toISOString().slice(0,10)).slice(0,4);
-  const tx=db.transaction(()=>{
-    const row=db.prepare("SELECT next_value FROM ross_sequences WHERE id=1").get();
-    let seq=Math.max(1,Number(row?.next_value||1));
-    let maxRossSeq=0;
-    const existing=db.prepare("SELECT ross_ids_json FROM stays WHERE ross_ids_json IS NOT NULL AND ross_ids_json<>''").all();
-    for(const r of existing){
-      try{
-        const ids=JSON.parse(r.ross_ids_json||"[]");
-        for(const id of (Array.isArray(ids)?ids:[])){
-          const m=String(id||"").match(new RegExp(`^CL${year}(\d+)-\d+$`));
-          if(m) maxRossSeq=Math.max(maxRossSeq,Number(m[1])||0);
-        }
-      }catch(_){}
-    }
-    if(seq<=maxRossSeq) seq=maxRossSeq+1;
-    const prefix=`CL${year}${seq}`;
-    const ids=Array.from({length:n},(_,i)=>`${prefix}-${i+1}`);
-    db.prepare("UPDATE ross_sequences SET next_value=? WHERE id=1").run(seq+1);
-    return ids;
+// Identificativi ROSS 1000: sequenza persistente e IDs memorizzati per soggiorno.
+// Se il database viene ricreato, la sequenza parte da un valore basato sul tempo
+// per evitare di riproporre vecchi IDsWH come CL20261-1.
+try { db.exec(`ALTER TABLE stays ADD COLUMN ross_ids_json TEXT`); } catch (_) {}
+db.exec(`CREATE TABLE IF NOT EXISTS ross_sequences (id INTEGER PRIMARY KEY CHECK(id=1), next_value INTEGER NOT NULL)`);
+const rossSeed = Math.floor(Date.now()/1000);
+const rossSeqRow = db.prepare("SELECT next_value FROM ross_sequences WHERE id=1").get();
+if (!rossSeqRow) db.prepare("INSERT INTO ross_sequences(id,next_value) VALUES(1,?)").run(rossSeed);
+
+function allocateRossStaySequence() {
+  const tx = db.transaction(() => {
+    const row = db.prepare("SELECT next_value FROM ross_sequences WHERE id=1").get();
+    const value = Number(row?.next_value || Math.floor(Date.now()/1000));
+    db.prepare("UPDATE ross_sequences SET next_value=? WHERE id=1").run(value + 1);
+    return value;
   });
   return tx();
 }
-function ensureRossIds(stay, forceNew=false) {
-  let ids=[];
-  try { ids=JSON.parse(stay.ross_ids_json||"[]"); } catch(_) { ids=[]; }
-  if(!forceNew && Array.isArray(ids) && ids.length>=stay.guests.length) return ids.slice(0,stay.guests.length);
-  ids=allocateRossIds(stay.guests.length,stay.arrival);
-  db.prepare("UPDATE stays SET ross_ids_json=? WHERE id=?").run(JSON.stringify(ids),stay.id);
-  stay.ross_ids_json=JSON.stringify(ids);
+
+function rossIdsForStay(stay) {
+  let ids = [];
+  try { ids = JSON.parse(stay.ross_ids_json || "[]"); } catch (_) { ids = []; }
+  if (Array.isArray(ids) && ids.length === stay.guests.length && ids.every(Boolean)) return ids;
+  const seq = allocateRossStaySequence();
+  const year = String(stay.arrival || new Date().toISOString().slice(0,10)).slice(0,4);
+  ids = stay.guests.map((_,i) => `CL${year}${seq}-${i+1}`);
+  db.prepare("UPDATE stays SET ross_ids_json=? WHERE id=?").run(JSON.stringify(ids), stay.id);
   return ids;
-}
-function hasSuccessfulRossTransmission(stayId){
-  return !!db.prepare("SELECT 1 FROM submissions WHERE stay_id=? AND service='ross1000' AND status='sent' ORDER BY id DESC LIMIT 1").get(stayId);
 }
 
 app.use(express.json({limit:"10mb"}));
@@ -183,30 +169,13 @@ app.post("/api/stays",(req,res)=>{
   const {arrival,nights,departure,guests}=req.body||{};
   if(!arrival||!departure||!Number.isInteger(Number(nights))||Number(nights)<1||Number(nights)>30||!Array.isArray(guests)||guests.length<1)
     return res.status(400).json({error:"DATI_INCOMPLETI_O_NUOVI_LIMITI"});
-  const rossIds=allocateRossIds(guests.length,arrival);
-  const info=db.prepare("INSERT INTO stays(arrival,nights,departure,guests_json,created_at,ross_ids_json) VALUES(?,?,?,?,?,?)")
-    .run(arrival,Number(nights),departure,JSON.stringify(guests),new Date().toISOString(),JSON.stringify(rossIds));
-  res.json({ok:true,id:info.lastInsertRowid,ross_ids:rossIds});
-});
-app.put("/api/stays/:id",(req,res)=>{
-  const {arrival,nights,departure,guests}=req.body||{};
-  if(!arrival||!departure||!Number.isInteger(Number(nights))||Number(nights)<1||Number(nights)>30||!Array.isArray(guests)||guests.length<1)
-    return res.status(400).json({error:"DATI_INCOMPLETI_O_NUOVI_LIMITI"});
-  const id=Number(req.params.id);
-  const exists=db.prepare("SELECT id FROM stays WHERE id=?").get(id);
-  if(!exists)return res.status(404).json({error:"SOGGIORNO_NON_TROVATO"});
-  db.prepare("UPDATE stays SET arrival=?,nights=?,departure=?,guests_json=? WHERE id=?")
-    .run(arrival,Number(nights),departure,JSON.stringify(guests),id);
-  res.json({ok:true,id});
+  const info=db.prepare("INSERT INTO stays(arrival,nights,departure,guests_json,created_at) VALUES(?,?,?,?,?)")
+    .run(arrival,Number(nights),departure,JSON.stringify(guests),new Date().toISOString());
+  res.json({ok:true,id:info.lastInsertRowid});
 });
 app.get("/api/stays",(req,res)=>{
   const rows=db.prepare("SELECT * FROM stays ORDER BY id DESC LIMIT 100").all();
   res.json(rows.map(r=>({...r,guests:JSON.parse(r.guests_json)})));
-});
-app.get("/api/stays/:id",(req,res)=>{
-  const r=db.prepare("SELECT * FROM stays WHERE id=?").get(Number(req.params.id));
-  if(!r)return res.status(404).json({error:"SOGGIORNO_NON_TROVATO"});
-  res.json({...r,guests:JSON.parse(r.guests_json)});
 });
 app.get("/api/submissions",(req,res)=>{
   const rows=db.prepare(`SELECT s.*, st.arrival, st.nights, st.departure, st.guests_json
@@ -231,10 +200,10 @@ function norm(s){return String(s||"").normalize("NFD").replace(/[\u0300-\u036f]/
 
 async function soapCall(action, body){
   const endpoint="https://alloggiatiweb.poliziadistato.it/service/Service.asmx";
-  const envelope=`<?xml version="1.0" encoding="utf-8"?><soap:Envelope xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns:xsd="http://www.w3.org/2001/XMLSchema" xmlns:soap="http://schemas.xmlsoap.org/soap/envelope/"><soap:Header/><soap:Body>${body}</soap:Body></soap:Envelope>`;
-  const r=await fetch(endpoint,{method:"POST",headers:{"Content-Type":"text/xml; charset=utf-8","SOAPAction":`"AlloggiatiService/${action}"`},body:envelope});
+  const envelope=`<?xml version="1.0" encoding="utf-8"?><soap:Envelope xmlns:soap="http://www.w3.org/2003/05/soap-envelope" xmlns:all="AlloggiatiService"><soap:Header/><soap:Body>${body}</soap:Body></soap:Envelope>`;
+  const r=await fetch(endpoint,{method:"POST",headers:{"Content-Type":"application/soap+xml; charset=utf-8","SOAPAction":`AlloggiatiService/${action}`},body:envelope});
   const text=await r.text();
-  if(!r.ok) throw new Error(`Alloggiati HTTP ${r.status}: ${text.slice(0,1000)}`);
+  if(!r.ok) throw new Error(`Alloggiati HTTP ${r.status}: ${text.slice(0,500)}`);
   return text;
 }
 async function alloggiatiGenerateToken(){
@@ -286,15 +255,7 @@ async function buildAlloggiatiRecords(stay){
   const token=await alloggiatiGenerateToken();
   const luoghi=await alloggiatiTable(token,"Luoghi");
   let statiCsv="";
-  try{
-    statiCsv=await fetchOfficialDownload("Stati");
-  }catch(_e){
-    // Se il download pubblico STATI non è disponibile (ad esempio perché
-    // il portale restituisce un archivio compresso), recuperiamo la tabella
-    // Nazioni direttamente dal Web Service Alloggiati. Non bisogna usare
-    // la tabella Luoghi come fallback: contiene i Comuni e non i Paesi.
-    statiCsv=await alloggiatiTable(token,"Nazioni");
-  }
+  try{statiCsv=await fetchOfficialDownload("Stati");}catch(_e){statiCsv=luoghi;}
   const docs=await alloggiatiTable(token,"Tipi_Documento");
   const types=await alloggiatiTable(token,"Tipi_Alloggiato");
   const typeCodes={
@@ -323,28 +284,16 @@ async function buildAlloggiatiRecords(stay){
       if(!String(g.stato_documento||'').trim()) g.stato_documento=countryToFull(g.cittadinanza);
     }
     const birthState=countryToFull(g.stato_nascita||g.stato_documento||g.cittadinanza);
-    // Preferiamo i codici ufficiali già selezionati nell'interfaccia. Se non
-    // sono presenti, li risolviamo comunque tramite le tabelle Alloggiati.
-    const birthStateCode=String(g.stato_nascita_code||g.birth_state_code||"").trim() || findCode(statiCsv,birthState||g.cittadinanza);
-    const nationalityCode=String(g.cittadinanza_code||"").trim() || findCode(statiCsv,g.cittadinanza);
-    const birthPlaceCode=String(g.luogo_nascita_code||g.birth_municipality_code||"").trim() || findCode(luoghi,g.luogo_nascita);
-    const docCode=isComponent?"":(String(g.tipo_documento_code||"").trim() || findDocCode(docs,g.tipo_documento||"Carta identità"));
+    const birthStateCode=findCode(statiCsv,birthState||g.cittadinanza);
+    const nationalityCode=findCode(statiCsv,g.cittadinanza);
+    const birthPlaceCode=findCode(luoghi,g.luogo_nascita);
+    const docCode=isComponent?"":findDocCode(docs,g.tipo_documento||"Carta identità");
     const releaseValue=g.stato_documento||g.luogo_rilascio||g.cittadinanza;
-    const releaseCode=isComponent?"":(String(g.stato_documento_code||g.luogo_rilascio_documento_code||g.issuing_country_code||"").trim() || (isItalianCountry(g.cittadinanza)?findCode(luoghi,releaseValue):findCode(statiCsv,releaseValue)));
+    const releaseCode=isComponent?"":(isItalianCountry(g.cittadinanza)?findCode(luoghi,releaseValue):findCode(statiCsv,releaseValue));
     const numeroDocumento=isComponent?"":g.numero_documento;
     const sesso=g.sesso==="M"?"1":g.sesso==="F"?"2":"";
-    const missing=[];
-    if(!g.cognome)missing.push("cognome");
-    if(!g.nome)missing.push("nome");
-    if(!g.nascita)missing.push("data nascita");
-    if(!sesso)missing.push("sesso");
-    if(!nationalityCode)missing.push(`cittadinanza (${g.cittadinanza||"vuota"})`);
-    if(!birthStateCode)missing.push(`stato nascita (${birthState||"vuoto"})`);
-    if(!isComponent && !docCode)missing.push(`documento (${g.tipo_documento||"vuoto"})`);
-    if(!isComponent && !numeroDocumento)missing.push("numero documento");
-    if(!isComponent && !releaseCode)missing.push(`luogo rilascio (${releaseValue||"vuoto"})`);
-    if(missing.length){
-      problems.push(`Ospite ${i+1}: dati/codici mancanti: ${missing.join(", ")}. Valori ricevuti: cittadinanza_code=${nationalityCode||"—"}, stato_nascita_code=${birthStateCode||"—"}, tipo_documento_code=${docCode||"—"}, luogo_rilascio_code=${releaseCode||"—"}.`); continue;
+    if(!g.cognome||!g.nome||!g.nascita||!sesso||!nationalityCode||!birthStateCode || (!isComponent && (!docCode||!numeroDocumento||!releaseCode))){
+      problems.push(`Ospite ${i+1}: dati/codici mancanti (controlla nascita, cittadinanza, sesso${isComponent?"":" , documento e luogo rilascio"}).`); continue;
     }
     if(birthStateCode==="100000100"&&!birthPlaceCode) problems.push(`Ospite ${i+1}: luogo di nascita "${g.luogo_nascita}" non trovato nella tabella Alloggiati.`);
     const line = fixed(typeCode,2)+fixed(isoToDMY(stay.arrival),10)+fixed(String(stay.nights).padStart(2,"0"),2)+fixed(g.cognome,50)+fixed(g.nome,30)+fixed(sesso,1)+fixed(isoToDMY(g.nascita),10)+fixed(birthStateCode==="100000100"?birthPlaceCode:"",9)+fixed(birthStateCode==="100000100"?(g.provincia_nascita||""):"",2)+fixed(birthStateCode,9)+fixed(nationalityCode,9)+fixed(docCode,5)+fixed(numeroDocumento,20)+fixed(releaseCode,9);
@@ -362,36 +311,18 @@ function countryToFull(v){
   return m[String(v||"").trim()]||String(v||"").trim();
 }
 async function alloggiatiSend(stay){
+  // Ripristino del metodo di invio della versione operativa V7: Send standard.
+  // Non viene usato GestioneAppartamenti_Send e non viene alterata la logica
+  // del lettore MRZ/OCR/ICAO lato client.
   const {token,records}=await buildAlloggiatiRecords(stay);
   const inner=records.map(x=>`<all:string>${xmlEscape(x)}</all:string>`).join("");
-  const apartmentId=String(process.env.ALLOGGIATI_ID_APPARTAMENTO||"").trim();
-  const method=apartmentId?"GestioneAppartamenti_Send":"Send";
-  const body=apartmentId
-    ? `<all:GestioneAppartamenti_Send><all:Utente>${xmlEscape(process.env.ALLOGGIATI_USER)}</all:Utente><all:token>${xmlEscape(token)}</all:token><all:ElencoSchedine>${inner}</all:ElencoSchedine><all:IdAppartamento>${xmlEscape(apartmentId)}</all:IdAppartamento></all:GestioneAppartamenti_Send>`
-    : `<all:Send><all:Utente>${xmlEscape(process.env.ALLOGGIATI_USER)}</all:Utente><all:token>${xmlEscape(token)}</all:token><all:ElencoSchedine>${inner}</all:ElencoSchedine></all:Send>`;
+  const body=`<all:Send><all:Utente>${xmlEscape(process.env.ALLOGGIATI_USER)}</all:Utente><all:token>${xmlEscape(token)}</all:token><all:ElencoSchedine>${inner}</all:ElencoSchedine></all:Send>`;
   const envelope=`<?xml version="1.0" encoding="utf-8"?><soap:Envelope xmlns:soap="http://www.w3.org/2003/05/soap-envelope" xmlns:all="AlloggiatiService"><soap:Header/><soap:Body>${body}</soap:Body></soap:Envelope>`;
-  const testAction=apartmentId?"GestioneAppartamenti_Test":"Test";
-  const testBody=apartmentId
-    ? `<all:GestioneAppartamenti_Test><all:Utente>${xmlEscape(process.env.ALLOGGIATI_USER)}</all:Utente><all:token>${xmlEscape(token)}</all:token><all:ElencoSchedine>${inner}</all:ElencoSchedine><all:IdAppartamento>${xmlEscape(apartmentId)}</all:IdAppartamento></all:GestioneAppartamenti_Test>`
-    : `<all:Test><all:Utente>${xmlEscape(process.env.ALLOGGIATI_USER)}</all:Utente><all:token>${xmlEscape(token)}</all:token><all:ElencoSchedine>${inner}</all:ElencoSchedine></all:Test>`;
-  const testText=await soapCall(testAction,testBody);
-  const testValid=Number(tag(testText,"SchedineValide")||0);
-  const testDetail=allTags(testText,"EsitoOperazioneServizio").map(x=>({esito:tag(x,"esito"),codice:tag(x,"ErroreCod"),descrizione:tag(x,"ErroreDes"),dettaglio:tag(x,"ErroreDettaglio")}));
-  const testGeneral=tag(testText,testAction+"Result")||tag(testText,"TestResult")||tag(testText,"GestioneAppartamenti_TestResult");
-  const testGeneralError=testGeneral?tag(testGeneral,"ErroreDettaglio"):"";
-  if(testValid!==records.length || testDetail.some(x=>String(x.esito).toLowerCase()==="false")){
-    const errors=testDetail.filter(x=>String(x.esito).toLowerCase()!=="true" || x.codice || x.descrizione || x.dettaglio);
-    return {ok:false,status:"error",valid:testValid,total:records.length,detail:errors.length?errors:testDetail,general:{esito:tag(testGeneral,"esito"),errore:testGeneralError},method,test_action:testAction,apartment_id:apartmentId||null,request_xml:envelope,raw:testText.slice(0,10000),validation_only:true};
-  }
-  const text=await soapCall(method,body);
+  const text=await soapCall("Send",body);
   const valid=Number(tag(text,"SchedineValide")||0);
   const detail=allTags(text,"EsitoOperazioneServizio").map(x=>({esito:tag(x,"esito"),codice:tag(x,"ErroreCod"),descrizione:tag(x,"ErroreDes"),dettaglio:tag(x,"ErroreDettaglio")}));
-  const resultTag=tag(text,method+"Result")||tag(text,"SendResult")||tag(text,"GestioneAppartamenti_SendResult");
-  const general={esito:resultTag?tag(resultTag,"esito"):"",errore:resultTag?tag(resultTag,"ErroreDettaglio"):""};
-  const apartmentError=!apartmentId && /Gestore di Appartamenti/i.test(`${general.errore} ${detail.map(x=>x.descrizione||x.dettaglio||"").join(" ")}`)
-    ? "L'utenza Alloggiati è di categoria Gestione Appartamenti. Configura ALLOGGIATI_ID_APPARTAMENTO con l'ID dell'appartamento presente in Alloggiati Web (Appartamenti > Elenco), poi ripeti l'invio."
-    : "";
-  return {ok:valid===records.length,status:valid===records.length?"sent":"partial",valid,total:records.length,detail,general,method,apartment_id:apartmentId||null,configuration_error:apartmentError,request_xml:envelope,raw:text.slice(0,5000)};
+  const general={esito:tag(text,"SendResult")?tag(tag(text,"SendResult"),"esito"):"",errore:tag(tag(text,"SendResult"),"ErroreDettaglio")};
+  return {ok:valid===records.length,status:valid===records.length?"sent":"partial",valid,total:records.length,detail,general,method:"Send",request_xml:envelope,raw:text.slice(0,5000)};
 }
 
 app.post("/api/test/alloggiati",async(req,res)=>{
@@ -452,7 +383,6 @@ app.post("/api/submit/:service/:stayId",async(req,res)=>{
     }
     if(service==="ross1000"){
       if(!process.env.ROSS_USER||!process.env.ROSS_PASSWORD||!process.env.ROSS_STRUCTURE_CODE) throw new Error("ROSS 1000 non configurato: servono ROSS_USER, ROSS_PASSWORD e ROSS_STRUCTURE_CODE.");
-      if(!hasSuccessfulRossTransmission(row.id)) ensureRossIds(stay,true);
       const result=await rossSend(stay);
       saveSubmission(row.id,service,result,result.request_xml||"",result.raw||"");
       return res.json(result);
@@ -471,107 +401,20 @@ app.post("/api/submit/ross1000/modify/:stayId",async(req,res)=>{
   const stay={...row,guests:JSON.parse(row.guests_json)};
   try{
     if(!process.env.ROSS_USER||!process.env.ROSS_PASSWORD||!process.env.ROSS_STRUCTURE_CODE) throw new Error("ROSS 1000 non configurato: servono ROSS_USER, ROSS_PASSWORD e ROSS_STRUCTURE_CODE.");
-
-    // Prima proviamo a recuperare la comunicazione dal nostro storico.
-    const previous=db.prepare(`SELECT request_payload FROM submissions
-      WHERE stay_id=? AND service IN ('ross1000','ross1000-modifica') AND status='sent'
-      ORDER BY id DESC LIMIT 1`).get(row.id);
-    const suppliedArrival=String(req.body?.previousArrival||"").trim();
-    const previousArrival=previous?.request_payload ? tag(previous.request_payload,"data") : suppliedArrival;
-    const currentArrival=yyyymmdd(stay.arrival);
-
-    // Se la comunicazione originale non è nel nostro storico, l'operatore può
-    // fornire manualmente la data precedente. Gli idswh possono essere forniti
-    // manualmente; se omessi, usiamo quelli normalmente generati per questo soggiorno.
-    const suppliedIds=Array.isArray(req.body?.previousIdswh)?req.body.previousIdswh.map(x=>String(x||"").trim()):[];
-    const previousIds=previous?.request_payload ? allTags(previous.request_payload,"idswh") : suppliedIds;
-    if(!previousArrival) throw new Error("ROSS 1000: comunicazione precedente non presente nello storico. Inserisci la data di arrivo della comunicazione precedente per generare la rettifica.");
-    if(previousArrival!==currentArrival && previousIds.length===0) throw new Error("ROSS 1000: impossibile generare la rettifica senza gli idswh della comunicazione precedente. Inseriscili nella schermata di recupero.");
-
-    // Se recuperiamo una comunicazione ROSS già inviata, gli idswh originali
-    // diventano gli identificativi persistenti del soggiorno anche per le versioni
-    // precedenti che non li avevano ancora salvati nella colonna ross_ids_json.
-    if(previousIds.length >= stay.guests.length){
-      stay.ross_ids_json=JSON.stringify(previousIds.slice(0,stay.guests.length));
-      db.prepare("UPDATE stays SET ross_ids_json=? WHERE id=?").run(stay.ross_ids_json,stay.id);
-    }
-    let result;
-    if(previousArrival && currentArrival && previousArrival!==currentArrival){
-      result=await rossModifyArrival(stay,previousArrival,previousIds);
-      result.message=result.ok
-        ? `ROSS 1000: rettifica completata. Eliminato il movimento precedente del ${previousArrival} e trasmesso quello del ${currentArrival}. Gli idswh precedenti sono stati mantenuti.`
-        : (result.error||result.message);
-    }else{
-      result=await rossSend(stay);
-      result.message=result.ok
-        ? "ROSS 1000: modifica/ritrasmissione inviata mantenendo gli stessi idswh del soggiorno."
-        : (result.error||result.message);
-    }
+    const result=await rossSend(stay);
+    result.message=result.ok
+      ? "ROSS 1000: modifica/ritrasmissione inviata mantenendo gli stessi idswh del soggiorno. Il tracciato prevede la ritrasmissione del movimento del giorno di arrivo per modificare dati già trasmessi."
+      : (result.error||result.message);
     saveSubmission(row.id,"ross1000-modifica",result,result.request_xml||"",result.raw||"");
     return res.json(result);
   }catch(e){
     const detail=String(e.message||e);
     saveSubmission(row.id,"ross1000-modifica",{status:"error",error:detail},"",detail);
-    return res.status(400).json({ok:false,status:"error",error:detail});
+    return res.status(502).json({ok:false,status:"error",error:detail});
   }
 });
 
 function rossXmlEscape(s=""){return xmlEscape(s);}
-
-async function rossModifyArrival(stay, previousArrival, previousIds=[]){
-  const endpoint=process.env.ROSS_ENDPOINT||"https://lazioturismo.ross1000.it/ws/checkinV2";
-  const product=process.env.ROSS_PRODUCT||"CheckIn Lazio";
-  const tourism=process.env.ROSS_TOURISM_DEFAULT||"Non Specificato";
-  const transport=process.env.ROSS_TRANSPORT_DEFAULT||"Non specificato";
-  const channel=process.env.ROSS_CHANNEL_DEFAULT||"Non specificato";
-  const roomsAvailable=Number(process.env.ROSS_ROOMS_AVAILABLE||1);
-  const bedsAvailable=Number(process.env.ROSS_BEDS_AVAILABLE||stay.guests.length);
-  const roomOccupied=1;
-  let typeCsv="", nationCsv="";
-  try{
-    if(process.env.ALLOGGIATI_USER&&process.env.ALLOGGIATI_PASSWORD&&process.env.ALLOGGIATI_WSKEY){
-      const tok=await alloggiatiGenerateToken();
-      nationCsv=await alloggiatiTable(tok,"Nazioni");
-      typeCsv=await alloggiatiTable(tok,"Tipi_Alloggiato");
-    }
-  }catch(_e){}
-  const codeOrValue=(v)=>{
-    if(!v)return "";
-    if(/^\d{6,9}$/.test(String(v).trim())) return String(v).trim();
-    return nationCsv?findCode(nationCsv,v):String(v).trim();
-  };
-  const rossIds=ensureRossIds(stay);
-  const rossRecordId=(guestIndex)=>String(rossIds[guestIndex]||"").trim();
-  const oldRossRecordId=(guestIndex)=>String(previousIds[guestIndex]||rossRecordId(guestIndex));
-  const rossTypeCodes={ospite_singolo:"16",capo_famiglia:"17",capo_gruppo:"18",familiare:"19",membro_gruppo:"20"};
-  const typeCodeFor=(guestType)=>typeCsv?findCode(typeCsv,guestType==="ospite_singolo"?"Ospite Singolo":guestType==="capo_famiglia"?"Capo Famiglia":guestType==="capo_gruppo"?"Capo Gruppo":guestType==="familiare"?"Familiare":"Membro Gruppo"):(rossTypeCodes[guestType]||"16");
-  const eliminazioni=stay.guests.map((g,i)=>`<eliminazione><idswh>${rossXmlEscape(oldRossRecordId(i))}</idswh><tipoalloggiato>${typeCodeFor(String(g.tipologia||"ospite_singolo"))}</tipoalloggiato><arrivo>${previousArrival}</arrivo></eliminazione>`).join("");
-  const arrivi=stay.guests.map((g,i)=>{
-    const guestType=String(g.tipologia||"ospite_singolo");
-    const typeCode=typeCodeFor(guestType);
-    const idcapo=(guestType==="familiare"||guestType==="membro_gruppo")?rossRecordId(0):"";
-    const idswh=rossRecordId(i);
-    const cittadinanza=codeOrValue(g.cittadinanza_code||g.cittadinanza);
-    const statoResidenza=codeOrValue(g.residenza_stato_code||g.residenza_stato||g.cittadinanza);
-    let luogoResidenza=String(g.residenza_luogo||"").trim();
-    if(!luogoResidenza && !/^100000100$/.test(statoResidenza)) luogoResidenza=String(g.cittadinanza||"").trim();
-    const comuneNascita=String(g.comune_nascita_code||"").trim();
-    const statoNascita=codeOrValue(g.stato_nascita_code||g.stato_nascita||g.cittadinanza);
-    return `<arrivo><idswh>${rossXmlEscape(idswh)}</idswh><tipoalloggiato>${typeCode}</tipoalloggiato><idcapo>${rossXmlEscape(idcapo)}</idcapo><cognome>${rossXmlEscape(g.cognome)}</cognome><nome>${rossXmlEscape(g.nome)}</nome><sesso>${g.sesso||""}</sesso><cittadinanza>${rossXmlEscape(cittadinanza)}</cittadinanza><statoresidenza>${rossXmlEscape(statoResidenza)}</statoresidenza><luogoresidenza>${rossXmlEscape(statoResidenza==="100000100"?(g.residenza_luogo_code||luogoResidenza):luogoResidenza)}</luogoresidenza><datanascita>${yyyymmdd(g.nascita)}</datanascita><statonascita>${rossXmlEscape(statoNascita)}</statonascita><comunenascita>${rossXmlEscape(statoNascita==="100000100"?comuneNascita:"")}</comunenascita><tipoturismo>${rossXmlEscape(g.tipoturismo||tourism)}</tipoturismo><mezzotrasporto>${rossXmlEscape(g.mezzotrasporto||transport)}</mezzotrasporto><canaleprenotazione>${rossXmlEscape(g.canaleprenotazione||channel)}</canaleprenotazione><titolostudio>${rossXmlEscape(g.titolostudio||"")}</titolostudio><professione>${rossXmlEscape(g.professione||"")}</professione><esenzioneimposta>${rossXmlEscape(g.esenzioneimposta||"")}</esenzioneimposta></arrivo>`;
-  }).join("");
-  const structure=(open=true)=>`<struttura><apertura>${open?"SI":"NO"}</apertura><camereoccupate>${open?roomOccupied:0}</camereoccupate><cameredisponibili>${open?roomsAvailable:0}</cameredisponibili><lettidisponibili>${open?bedsAvailable:0}</lettidisponibili></struttura>`;
-  const xml=`<?xml version="1.0" encoding="UTF-8"?><S:Envelope xmlns:S="http://schemas.xmlsoap.org/soap/envelope/"><S:Body><ns2:inviaMovimentazione xmlns:ns2="http://checkin.ws.service.turismo5.gies.it/"><movimentazione><codice>${rossXmlEscape(process.env.ROSS_STRUCTURE_CODE)}</codice><prodotto>${rossXmlEscape(product)}</prodotto><movimento><data>${previousArrival}</data>${structure(true)}<rettifiche>${eliminazioni}</rettifiche></movimento><movimento><data>${currentArrival}</data>${structure(true)}<arrivi>${arrivi}</arrivi></movimento></movimentazione></ns2:inviaMovimentazione></S:Body></S:Envelope>`;
-  const auth=Buffer.from(`${process.env.ROSS_USER}:${process.env.ROSS_PASSWORD}`).toString("base64");
-  const r=await fetch(endpoint,{method:"POST",headers:{Accept:"text/xml, multipart/related",Authorization:`Basic ${auth}`,"Content-Type":"text/xml; charset=utf-8",SOAPAction:"","User-Agent":"CheckIn-Lazio/1.0"},body:xml});
-  const text=await r.text();
-  if(!r.ok) throw new Error(`ROSS HTTP ${r.status}: ${text.slice(0,1200)}`);
-  const fault=tag(text,"faultstring")||tag(text,"detail");
-  if(fault) return {ok:false,status:"error",error:fault,raw:text.slice(0,5000),request_xml:xml};
-  const responseError=tag(text,"ErroreDettaglio")||tag(text,"errore")||tag(text,"error");
-  if(responseError) return {ok:false,status:"error",error:`ROSS 1000: ${responseError}`,raw:text.slice(0,5000),request_xml:xml};
-  return {ok:true,status:"sent",raw:text.slice(0,5000),request_xml:xml};
-}
-
 async function rossSend(stay){
   const endpoint=process.env.ROSS_ENDPOINT||"https://lazioturismo.ross1000.it/ws/checkinV2";
   const product=process.env.ROSS_PRODUCT||"CheckIn Lazio";
@@ -582,8 +425,8 @@ async function rossSend(stay){
   const bedsAvailable=Number(process.env.ROSS_BEDS_AVAILABLE||stay.guests.length);
   const roomOccupied=1;
   let typeCsv="";
-  const rossTypeCodes={ospite_singolo:"16",capo_famiglia:"17",capo_gruppo:"18",familiare:"19",membro_gruppo:"20"};
   let nationCsv="";
+  const rossTypeCodes={ospite_singolo:"16",capo_famiglia:"17",capo_gruppo:"18",familiare:"19",membro_gruppo:"20"};
   try{
     if(process.env.ALLOGGIATI_USER&&process.env.ALLOGGIATI_PASSWORD&&process.env.ALLOGGIATI_WSKEY){
       const tok=await alloggiatiGenerateToken();
@@ -596,24 +439,19 @@ async function rossSend(stay){
     if(/^\d{6,9}$/.test(String(v).trim())) return String(v).trim();
     return nationCsv?findCode(nationCsv,v):String(v).trim();
   };
-  // ROSS richiede un idswh univoco per ogni record della struttura.
-  // L'identificativo viene assegnato una sola volta al soggiorno e salvato nel DB,
-  // così non riparte da CL20261-1 dopo un riavvio del processo.
-  // Per un soggiorno con più ospiti: CL20261-1, CL20261-2, ...
-  const rossIds=ensureRossIds(stay);
-  const rossRecordId=(guestIndex)=>String(rossIds[guestIndex]||"").trim();
+  const rossIds=rossIdsForStay(stay);
   const arrivi=stay.guests.map((g,i)=>{
     const guestType=String(g.tipologia||"ospite_singolo");
-    const typeCode=typeCsv?findCode(typeCsv,guestType==="ospite_singolo"?"Ospite Singolo":guestType==="capo_famiglia"?"Capo Famiglia":guestType==="capo_gruppo"?"Capo Gruppo":guestType==="familiare"?"Familiare":"Membro Gruppo"):(rossTypeCodes[guestType]||"16");
-    const idcapo=(guestType==="familiare"||guestType==="membro_gruppo")?rossRecordId(0):"";
-    const idswh=rossRecordId(i);
+    const typeName=guestType==="ospite_singolo"?"Ospite Singolo":guestType==="capo_famiglia"?"Capo Famiglia":guestType==="capo_gruppo"?"Capo Gruppo":guestType==="familiare"?"Familiare":"Membro Gruppo";
+    const typeCode=typeCsv?findCode(typeCsv,typeName):(rossTypeCodes[guestType]||"16");
+    const idcapo=(guestType==="familiare"||guestType==="membro_gruppo")?rossIds[0]:"";
     const cittadinanza=codeOrValue(g.cittadinanza_code||g.cittadinanza);
     const statoResidenza=codeOrValue(g.residenza_stato_code||g.residenza_stato||g.cittadinanza);
     let luogoResidenza=String(g.residenza_luogo||"").trim();
     if(!luogoResidenza && !/^100000100$/.test(statoResidenza)) luogoResidenza=String(g.cittadinanza||"").trim();
-    const comuneNascita=String(g.comune_nascita_code||"").trim();
+    const comuneNascita=String(g.comune_nascita_code||g.luogo_nascita_code||"").trim();
     const statoNascita=codeOrValue(g.stato_nascita_code||g.stato_nascita||g.cittadinanza);
-    return `<arrivo><idswh>${rossXmlEscape(idswh)}</idswh><tipoalloggiato>${typeCode}</tipoalloggiato><idcapo>${rossXmlEscape(idcapo)}</idcapo><cognome>${rossXmlEscape(g.cognome)}</cognome><nome>${rossXmlEscape(g.nome)}</nome><sesso>${g.sesso||""}</sesso><cittadinanza>${rossXmlEscape(cittadinanza)}</cittadinanza><statoresidenza>${rossXmlEscape(statoResidenza)}</statoresidenza><luogoresidenza>${rossXmlEscape(statoResidenza==="100000100"?(g.residenza_luogo_code||luogoResidenza):luogoResidenza)}</luogoresidenza><datanascita>${yyyymmdd(g.nascita)}</datanascita><statonascita>${rossXmlEscape(statoNascita)}</statonascita><comunenascita>${rossXmlEscape(statoNascita==="100000100"?comuneNascita:"")}</comunenascita><tipoturismo>${rossXmlEscape(g.tipoturismo||tourism)}</tipoturismo><mezzotrasporto>${rossXmlEscape(g.mezzotrasporto||transport)}</mezzotrasporto><canaleprenotazione>${rossXmlEscape(g.canaleprenotazione||channel)}</canaleprenotazione><titolostudio>${rossXmlEscape(g.titolostudio||"")}</titolostudio><professione>${rossXmlEscape(g.professione||"")}</professione><esenzioneimposta>${rossXmlEscape(g.esenzioneimposta||"")}</esenzioneimposta></arrivo>`;
+    return `<arrivo><idswh>${rossXmlEscape(rossIds[i])}</idswh><tipoalloggiato>${typeCode}</tipoalloggiato><idcapo>${rossXmlEscape(idcapo)}</idcapo><cognome>${rossXmlEscape(g.cognome)}</cognome><nome>${rossXmlEscape(g.nome)}</nome><sesso>${g.sesso||""}</sesso><cittadinanza>${rossXmlEscape(cittadinanza)}</cittadinanza><statoresidenza>${rossXmlEscape(statoResidenza)}</statoresidenza><luogoresidenza>${rossXmlEscape(statoResidenza==="100000100"?(g.residenza_luogo_code||luogoResidenza):luogoResidenza)}</luogoresidenza><datanascita>${yyyymmdd(g.nascita)}</datanascita><statonascita>${rossXmlEscape(statoNascita)}</statonascita><comunenascita>${rossXmlEscape(statoNascita==="100000100"?comuneNascita:"")}</comunenascita><tipoturismo>${rossXmlEscape(g.tipoturismo||tourism)}</tipoturismo><mezzotrasporto>${rossXmlEscape(g.mezzotrasporto||transport)}</mezzotrasporto><canaleprenotazione>${rossXmlEscape(g.canaleprenotazione||channel)}</canaleprenotazione><titolostudio>${rossXmlEscape(g.titolostudio||"")}</titolostudio><professione>${rossXmlEscape(g.professione||"")}</professione><esenzioneimposta>${rossXmlEscape(g.esenzioneimposta||"")}</esenzioneimposta></arrivo>`;
   }).join("");
   const xml=`<?xml version="1.0" encoding="UTF-8"?><S:Envelope xmlns:S="http://schemas.xmlsoap.org/soap/envelope/"><S:Body><ns2:inviaMovimentazione xmlns:ns2="http://checkin.ws.service.turismo5.gies.it/"><movimentazione><codice>${rossXmlEscape(process.env.ROSS_STRUCTURE_CODE)}</codice><prodotto>${rossXmlEscape(product)}</prodotto><movimento><data>${yyyymmdd(stay.arrival)}</data><struttura><apertura>SI</apertura><camereoccupate>${roomOccupied}</camereoccupate><cameredisponibili>${roomsAvailable}</cameredisponibili><lettidisponibili>${bedsAvailable}</lettidisponibili></struttura><arrivi>${arrivi}</arrivi></movimento></movimentazione></ns2:inviaMovimentazione></S:Body></S:Envelope>`;
   const auth=Buffer.from(`${process.env.ROSS_USER}:${process.env.ROSS_PASSWORD}`).toString("base64");
@@ -621,10 +459,10 @@ async function rossSend(stay){
   const text=await r.text();
   if(!r.ok) throw new Error(`ROSS HTTP ${r.status}: ${text.slice(0,1200)}`);
   const fault=tag(text,"faultstring")||tag(text,"detail");
-  if(fault) return {ok:false,status:"error",error:fault,raw:text.slice(0,5000),request_xml:xml};
+  if(fault) return {ok:false,status:"error",error:fault,raw:text.slice(0,5000),request_xml:xml,idswh:rossIds};
   const responseError=tag(text,"ErroreDettaglio")||tag(text,"errore")||tag(text,"error");
-  if(responseError) return {ok:false,status:"error",error:`ROSS 1000: ${responseError}`,raw:text.slice(0,5000),request_xml:xml};
-  return {ok:true,status:"sent",message:"ROSS 1000: richiesta SOAP inviata. Identificativi idswh univoci per il soggiorno; camera occupata conteggiata una sola volta; per familiari/membri di gruppo sono stati inviati tipo e idcapo previsti. In caso di modifica, lo stesso idswh viene mantenuto.",raw:text.slice(0,5000),request_xml:xml};
+  if(responseError) return {ok:false,status:"error",error:`ROSS 1000: ${responseError}`,raw:text.slice(0,5000),request_xml:xml,idswh:rossIds};
+  return {ok:true,status:"sent",message:`ROSS 1000: richiesta SOAP inviata. IDsWH assegnati: ${rossIds.join(", ")}. Per eventuali modifiche/ritrasmissioni gli stessi IDsWH vengono mantenuti.`,raw:text.slice(0,5000),request_xml:xml,idswh:rossIds};
 }
 
 app.get(/.*/, (req,res)=>res.sendFile(path.join(__dirname,"public","index.html")));
