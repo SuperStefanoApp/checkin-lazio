@@ -28,13 +28,102 @@ CREATE TABLE IF NOT EXISTS submissions (
   response_payload TEXT,
   created_at TEXT NOT NULL
 );
+CREATE TABLE IF NOT EXISTS ross_sequences (
+  id INTEGER PRIMARY KEY CHECK(id=1),
+  next_value INTEGER NOT NULL
+);
+INSERT OR IGNORE INTO ross_sequences(id,next_value) VALUES(1,1);
 
 `);
 
 // Migrazione compatibile con le installazioni già esistenti: la cronologia
 // conserva anche richiesta e risposta effettivamente trasmesse ai servizi.
+// Gli IDsWH ROSS vengono inoltre conservati per soggiorno, così una
+// ritrasmissione/modifica mantiene gli stessi identificativi.
 for (const col of ["request_payload", "response_payload"]) {
   try { db.exec(`ALTER TABLE submissions ADD COLUMN ${col} TEXT`); } catch (_) {}
+}
+try { db.exec(`ALTER TABLE stays ADD COLUMN ross_ids_json TEXT`); } catch (_) {}
+
+function extractRossIdsFromXml(xml) {
+  if (!xml) return [];
+  const out = [];
+  const re = /<idswh>\s*([^<]+?)\s*<\/idswh>/gi;
+  let m;
+  while ((m = re.exec(String(xml)))) out.push(String(m[1]).trim());
+  return out;
+}
+
+function allocateRossIds(count, arrival) {
+  const n = Math.max(1, Number(count) || 1);
+  const year = String(arrival || new Date().toISOString().slice(0,10)).slice(0,4);
+  const tx = db.transaction(() => {
+    const row = db.prepare("SELECT next_value FROM ross_sequences WHERE id=1").get();
+    let seq = Math.max(1, Number(row?.next_value || 1));
+
+    // Recupera anche gli IDs già presenti nello storico, compresi quelli
+    // generati dalle versioni precedenti che non avevano ross_ids_json.
+    let maxRossSeq = 0;
+    const saved = db.prepare("SELECT ross_ids_json FROM stays WHERE ross_ids_json IS NOT NULL AND ross_ids_json<>''").all();
+    for (const r of saved) {
+      try {
+        const ids = JSON.parse(r.ross_ids_json || "[]");
+        for (const id of (Array.isArray(ids) ? ids : [])) {
+          const m = String(id || "").match(new RegExp(`^CL${year}(\\d+)-\\d+$`));
+          if (m) maxRossSeq = Math.max(maxRossSeq, Number(m[1]) || 0);
+        }
+      } catch (_) {}
+    }
+    const sent = db.prepare("SELECT request_payload FROM submissions WHERE service LIKE 'ross1000%' AND request_payload IS NOT NULL AND request_payload<>''").all();
+    for (const r of sent) {
+      for (const id of extractRossIdsFromXml(r.request_payload)) {
+        const m = String(id || "").match(new RegExp(`^CL${year}(\\d+)-\\d+$`));
+        if (m) maxRossSeq = Math.max(maxRossSeq, Number(m[1]) || 0);
+      }
+    }
+
+    if (seq <= maxRossSeq) seq = maxRossSeq + 1;
+
+    const prefix = `CL${year}${seq}`;
+    const ids = Array.from({length:n}, (_, i) => `${prefix}-${i+1}`);
+    db.prepare("UPDATE ross_sequences SET next_value=? WHERE id=1").run(seq + 1);
+    return ids;
+  });
+  return tx();
+}
+
+function ensureRossIds(stay, forceNew=false) {
+  let ids = [];
+  try { ids = JSON.parse(stay.ross_ids_json || "[]"); } catch (_) { ids = []; }
+
+  if (!forceNew && Array.isArray(ids) && ids.length >= stay.guests.length && ids.every(Boolean)) {
+    return ids.slice(0, stay.guests.length);
+  }
+
+  // Prima di crearne di nuovi, recuperiamo quelli di una eventuale
+  // comunicazione ROSS già effettuata da una versione precedente.
+  if (!forceNew) {
+    const previous = db.prepare(`SELECT request_payload FROM submissions
+      WHERE stay_id=? AND service LIKE 'ross1000%' AND status='sent'
+        AND request_payload IS NOT NULL AND request_payload<>''
+      ORDER BY id DESC LIMIT 1`).get(stay.id);
+    const previousIds = extractRossIdsFromXml(previous?.request_payload || "");
+    if (previousIds.length >= stay.guests.length) {
+      ids = previousIds.slice(0, stay.guests.length);
+      db.prepare("UPDATE stays SET ross_ids_json=? WHERE id=?").run(JSON.stringify(ids), stay.id);
+      stay.ross_ids_json = JSON.stringify(ids);
+      return ids;
+    }
+  }
+
+  ids = allocateRossIds(stay.guests.length, stay.arrival);
+  db.prepare("UPDATE stays SET ross_ids_json=? WHERE id=?").run(JSON.stringify(ids), stay.id);
+  stay.ross_ids_json = JSON.stringify(ids);
+  return ids;
+}
+
+function hasSuccessfulRossTransmission(stayId){
+  return !!db.prepare("SELECT 1 FROM submissions WHERE stay_id=? AND service='ross1000' AND status='sent' ORDER BY id DESC LIMIT 1").get(stayId);
 }
 
 app.use(express.json({limit:"10mb"}));
@@ -183,9 +272,13 @@ app.post("/api/stays",(req,res)=>{
   const {arrival,nights,departure,guests}=req.body||{};
   if(!arrival||!departure||!Number.isInteger(Number(nights))||Number(nights)<1||Number(nights)>30||!Array.isArray(guests)||guests.length<1)
     return res.status(400).json({error:"DATI_INCOMPLETI_O_NUOVI_LIMITI"});
-  const info=db.prepare("INSERT INTO stays(arrival,nights,departure,guests_json,created_at) VALUES(?,?,?,?,?)")
-    .run(arrival,Number(nights),departure,JSON.stringify(guests),new Date().toISOString());
-  res.json({ok:true,id:info.lastInsertRowid});
+  // Assegna gli IDsWH al momento del salvataggio: ogni ospite riceve
+  // un identificativo diverso e il soggiorno mantiene gli stessi IDs anche
+  // dopo riavvii dell'applicazione.
+  const rossIds=allocateRossIds(guests.length,arrival);
+  const info=db.prepare("INSERT INTO stays(arrival,nights,departure,guests_json,created_at,ross_ids_json) VALUES(?,?,?,?,?,?)")
+    .run(arrival,Number(nights),departure,JSON.stringify(guests),new Date().toISOString(),JSON.stringify(rossIds));
+  res.json({ok:true,id:info.lastInsertRowid,ross_ids:rossIds});
 });
 app.get("/api/stays",(req,res)=>{
   const rows=db.prepare("SELECT * FROM stays ORDER BY id DESC LIMIT 100").all();
@@ -418,6 +511,10 @@ app.post("/api/submit/:service/:stayId",async(req,res)=>{
     }
     if(service==="ross1000"){
       if(!process.env.ROSS_USER||!process.env.ROSS_PASSWORD||!process.env.ROSS_STRUCTURE_CODE) throw new Error("ROSS 1000 non configurato: servono ROSS_USER, ROSS_PASSWORD e ROSS_STRUCTURE_CODE.");
+      // Se il soggiorno è stato già inviato, non cambiare gli IDsWH.
+      // Se invece proviene da una vecchia versione, recupera prima gli IDs
+      // dallo storico oppure assegnane di nuovi e persistili.
+      ensureRossIds(stay);
       const result=await rossSend(stay);
       saveSubmission(row.id,service,result,result.request_xml||"",result.raw||"");
       return res.json(result);
@@ -498,8 +595,15 @@ async function rossModifyArrival(stay, previousArrival, previousIds=[]){
     if(/^\d{6,9}$/.test(String(v).trim())) return String(v).trim();
     return nationCsv?findCode(nationCsv,v):String(v).trim();
   };
-  const rossRecordId=(guestIndex)=>`CL${String(stay.arrival||"").slice(0,4)}${String(stay.id)}-${guestIndex+1}`;
-  const oldRossRecordId=(guestIndex)=>String(previousIds[guestIndex]||rossRecordId(guestIndex));
+  // In una rettifica ROSS gli IDsWH della comunicazione precedente devono
+  // essere mantenuti anche se cambia la data di arrivo. Se non sono disponibili
+  // recuperiamo quelli persistiti nel soggiorno.
+  let persistentIds=[];
+  try { persistentIds=JSON.parse(stay.ross_ids_json||"[]"); } catch (_) { persistentIds=[]; }
+  let currentIds=(previousIds.length>=stay.guests.length ? previousIds : persistentIds);
+  if(currentIds.length < stay.guests.length) currentIds=ensureRossIds(stay);
+  const rossRecordId=(guestIndex)=>String(currentIds[guestIndex]||"").trim();
+  const oldRossRecordId=(guestIndex)=>String(previousIds[guestIndex]||currentIds[guestIndex]||"").trim();
   const rossTypeCodes={ospite_singolo:"16",capo_famiglia:"17",capo_gruppo:"18",familiare:"19",membro_gruppo:"20"};
   const typeCodeFor=(guestType)=>typeCsv?findCode(typeCsv,guestType==="ospite_singolo"?"Ospite Singolo":guestType==="capo_famiglia"?"Capo Famiglia":guestType==="capo_gruppo"?"Capo Gruppo":guestType==="familiare"?"Familiare":"Membro Gruppo"):(rossTypeCodes[guestType]||"16");
   const eliminazioni=stay.guests.map((g,i)=>`<eliminazione><idswh>${rossXmlEscape(oldRossRecordId(i))}</idswh><tipoalloggiato>${typeCodeFor(String(g.tipologia||"ospite_singolo"))}</tipoalloggiato><arrivo>${previousArrival}</arrivo></eliminazione>`).join("");
@@ -554,10 +658,11 @@ async function rossSend(stay){
     return nationCsv?findCode(nationCsv,v):String(v).trim();
   };
   // ROSS richiede un idswh univoco per ogni record della stessa struttura.
-  // Deve inoltre restare invariato se lo stesso soggiorno viene ritrasmesso.
-  // Usiamo quindi l'ID persistente del soggiorno + anno + indice ospite,
-  // mantenendo il valore entro i 20 caratteri previsti dal tracciato.
-  const rossRecordId=(guestIndex)=>`CL${String(stay.arrival||"").slice(0,4)}${String(stay.id)}-${guestIndex+1}`;
+  // L'identificativo viene assegnato una sola volta al soggiorno, salvato nel DB
+  // e riutilizzato per le ritrasmissioni. Non viene quindi ricreato usando
+  // l'ID SQLite, che può ripartire dopo un ripristino/riavvio.
+  const rossIds=ensureRossIds(stay);
+  const rossRecordId=(guestIndex)=>String(rossIds[guestIndex]||"").trim();
   const arrivi=stay.guests.map((g,i)=>{
     const guestType=String(g.tipologia||"ospite_singolo");
     const typeCode=typeCsv?findCode(typeCsv,guestType==="ospite_singolo"?"Ospite Singolo":guestType==="capo_famiglia"?"Capo Famiglia":guestType==="capo_gruppo"?"Capo Gruppo":guestType==="familiare"?"Familiare":"Membro Gruppo"):(rossTypeCodes[guestType]||"16");
@@ -580,7 +685,7 @@ async function rossSend(stay){
   if(fault) return {ok:false,status:"error",error:fault,raw:text.slice(0,5000),request_xml:xml};
   const responseError=tag(text,"ErroreDettaglio")||tag(text,"errore")||tag(text,"error");
   if(responseError) return {ok:false,status:"error",error:`ROSS 1000: ${responseError}`,raw:text.slice(0,5000),request_xml:xml};
-  return {ok:true,status:"sent",message:"ROSS 1000: richiesta SOAP inviata. Identificativi idswh univoci per il soggiorno; camera occupata conteggiata una sola volta; per familiari/membri di gruppo sono stati inviati tipo e idcapo previsti. In caso di modifica, lo stesso idswh viene mantenuto.",raw:text.slice(0,5000),request_xml:xml};
+  return {ok:true,status:"sent",message:`ROSS 1000: richiesta SOAP inviata. IDsWH assegnati: ${rossIds.join(", ")}. Camera occupata conteggiata una sola volta; per familiari/membri di gruppo sono stati inviati tipo e idcapo previsti. In caso di modifica, gli stessi IDsWH vengono mantenuti.`,raw:text.slice(0,5000),request_xml:xml,idswh:rossIds};
 }
 
 app.get(/.*/, (req,res)=>res.sendFile(path.join(__dirname,"public","index.html")));

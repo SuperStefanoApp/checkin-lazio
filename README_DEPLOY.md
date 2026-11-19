@@ -1,30 +1,25 @@
-# CheckIn Lazio – V37 Tabelle ufficiali Alloggiati Web
+# CheckIn Lazio V37 - Tabelle ufficiali Alloggiati + IDsWH ROSS persistenti
 
-Questa versione mantiene invariata la parte frontend di V37, compresi lettura MRZ, OCR e ICAO.
+Questa build mantiene la V37 con:
+- tabelle ufficiali Alloggiati Web;
+- cronologia soggiorni e trasmissioni;
+- MRZ/OCR/ICAO del frontend invariati;
+- ROSS 1000 invariato nella struttura SOAP e nei campi già presenti.
 
-## Correzione principale
-- Le tabelle usate per Alloggiati Web vengono recuperate dai download ufficiali della Polizia di Stato:
-  - Comuni
-  - Stati
-  - Tipo Documento
-  - Tipo Alloggiato
-- Il download ufficiale viene gestito sia se restituisce CSV diretto sia se restituisce un archivio ZIP.
-- Le codifiche usate nella generazione del tracciato Alloggiati vengono prese dalle stesse tabelle ufficiali.
-- Per la ricerca dei comuni dell'interfaccia viene usata la tabella ufficiale Alloggiati, non un dataset esterno.
-- È stato eliminato il fallback non documentato verso `Nazioni` nel Web Service Alloggiati.
-- Il Web Service continua a essere usato per autenticazione/token e per le tabelle per cui il manuale ufficiale documenta il metodo `Tabella`.
+## Correzione IDsWH ROSS 1000
 
-## Environment
-Mantieni le variabili già presenti in Render:
-- ADMIN_USER
-- ADMIN_PASSWORD
-- SESSION_SECRET
-- ALLOGGIATI_USER
-- ALLOGGIATI_PASSWORD
-- ALLOGGIATI_WSKEY
-- ROSS_USER
-- ROSS_PASSWORD
-- ROSS_STRUCTURE_CODE
-- ROSS_ENDPOINT=https://lazioturismo.ross1000.it/ws/checkinV2
+Gli IDsWH non vengono più ricavati dall'ID SQLite del soggiorno.
 
-Non sono state modificate le funzioni ROSS 1000 né la parte MRZ/OCR/ICAO.
+Ora:
+- al salvataggio del check-in viene assegnato un ID diverso a ogni ospite;
+- per esempio, un soggiorno con 3 ospiti può ricevere `CL20261-1`, `CL20261-2`, `CL20261-3`;
+- il soggiorno successivo riceve una nuova progressione, ad esempio `CL20262-1`, `CL20262-2`;
+- la sequenza viene salvata nel database e quindi non viene ricreata da `1` a ogni riavvio del processo;
+- se una vecchia comunicazione ROSS è già presente nello storico ma non aveva ancora `ross_ids_json`, gli IDsWH vengono recuperati dal payload XML già trasmesso;
+- nelle rettifiche/modifiche gli IDsWH della comunicazione precedente vengono mantenuti.
+
+## Nota sulla persistenza
+
+La sequenza è persistita nel database SQLite usato dall'applicazione. Per mantenere lo storico e la progressione anche dopo la ricreazione completa del container Render, il percorso `DB_PATH` deve essere su storage persistente di Render.
+
+Deploy: sostituire i file del repository con quelli presenti in questo archivio e lasciare che Render effettui il deploy.
