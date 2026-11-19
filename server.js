@@ -49,9 +49,18 @@ function allocateRossIds(count, arrival) {
   const tx=db.transaction(()=>{
     const row=db.prepare("SELECT next_value FROM ross_sequences WHERE id=1").get();
     let seq=Math.max(1,Number(row?.next_value||1));
-    // Evita collisioni se il database contiene già soggiorni creati nelle versioni precedenti.
-    const maxStay=Number(db.prepare("SELECT COALESCE(MAX(id),0) AS m FROM stays").get().m||0);
-    if(seq<=maxStay) seq=maxStay+1;
+    let maxRossSeq=0;
+    const existing=db.prepare("SELECT ross_ids_json FROM stays WHERE ross_ids_json IS NOT NULL AND ross_ids_json<>''").all();
+    for(const r of existing){
+      try{
+        const ids=JSON.parse(r.ross_ids_json||"[]");
+        for(const id of (Array.isArray(ids)?ids:[])){
+          const m=String(id||"").match(new RegExp(`^CL${year}(\d+)-\d+$`));
+          if(m) maxRossSeq=Math.max(maxRossSeq,Number(m[1])||0);
+        }
+      }catch(_){}
+    }
+    if(seq<=maxRossSeq) seq=maxRossSeq+1;
     const prefix=`CL${year}${seq}`;
     const ids=Array.from({length:n},(_,i)=>`${prefix}-${i+1}`);
     db.prepare("UPDATE ross_sequences SET next_value=? WHERE id=1").run(seq+1);
@@ -59,17 +68,17 @@ function allocateRossIds(count, arrival) {
   });
   return tx();
 }
-function ensureRossIds(stay) {
+function ensureRossIds(stay, forceNew=false) {
   let ids=[];
   try { ids=JSON.parse(stay.ross_ids_json||"[]"); } catch(_) { ids=[]; }
-  if(Array.isArray(ids) && ids.length>=stay.guests.length) return ids.slice(0,stay.guests.length);
-  const missing=Math.max(0,stay.guests.length-ids.length);
-  if(!missing) return ids;
-  const extra=allocateRossIds(missing,stay.arrival);
-  ids=[...ids,...extra];
+  if(!forceNew && Array.isArray(ids) && ids.length>=stay.guests.length) return ids.slice(0,stay.guests.length);
+  ids=allocateRossIds(stay.guests.length,stay.arrival);
   db.prepare("UPDATE stays SET ross_ids_json=? WHERE id=?").run(JSON.stringify(ids),stay.id);
   stay.ross_ids_json=JSON.stringify(ids);
   return ids;
+}
+function hasSuccessfulRossTransmission(stayId){
+  return !!db.prepare("SELECT 1 FROM submissions WHERE stay_id=? AND service='ross1000' AND status='sent' ORDER BY id DESC LIMIT 1").get(stayId);
 }
 
 app.use(express.json({limit:"10mb"}));
@@ -443,6 +452,7 @@ app.post("/api/submit/:service/:stayId",async(req,res)=>{
     }
     if(service==="ross1000"){
       if(!process.env.ROSS_USER||!process.env.ROSS_PASSWORD||!process.env.ROSS_STRUCTURE_CODE) throw new Error("ROSS 1000 non configurato: servono ROSS_USER, ROSS_PASSWORD e ROSS_STRUCTURE_CODE.");
+      if(!hasSuccessfulRossTransmission(row.id)) ensureRossIds(stay,true);
       const result=await rossSend(stay);
       saveSubmission(row.id,service,result,result.request_xml||"",result.raw||"");
       return res.json(result);
