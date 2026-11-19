@@ -200,10 +200,12 @@ function norm(s){return String(s||"").normalize("NFD").replace(/[\u0300-\u036f]/
 
 async function soapCall(action, body){
   const endpoint="https://alloggiatiweb.poliziadistato.it/service/Service.asmx";
-  const envelope=`<?xml version="1.0" encoding="utf-8"?><soap:Envelope xmlns:soap="http://www.w3.org/2003/05/soap-envelope" xmlns:all="AlloggiatiService"><soap:Header/><soap:Body>${body}</soap:Body></soap:Envelope>`;
-  const r=await fetch(endpoint,{method:"POST",headers:{"Content-Type":"application/soap+xml; charset=utf-8","SOAPAction":`AlloggiatiService/${action}`},body:envelope});
+  // Usiamo SOAP 1.1, come nel tracciato ufficiale Alloggiati Web.
+  // In particolare SOAPAction deve essere valorizzato tra virgolette.
+  const envelope=`<?xml version="1.0" encoding="utf-8"?><soap:Envelope xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns:xsd="http://www.w3.org/2001/XMLSchema" xmlns:soap="http://schemas.xmlsoap.org/soap/envelope/"><soap:Header/><soap:Body>${body}</soap:Body></soap:Envelope>`;
+  const r=await fetch(endpoint,{method:"POST",headers:{"Content-Type":"text/xml; charset=utf-8","SOAPAction":`"AlloggiatiService/${action}"`},body:envelope});
   const text=await r.text();
-  if(!r.ok) throw new Error(`Alloggiati HTTP ${r.status}: ${text.slice(0,500)}`);
+  if(!r.ok) throw new Error(`Alloggiati HTTP ${r.status}: ${text.slice(0,1200)}`);
   return text;
 }
 async function alloggiatiGenerateToken(){
@@ -428,12 +430,22 @@ async function rossSend(stay){
   let nationCsv="";
   const rossTypeCodes={ospite_singolo:"16",capo_famiglia:"17",capo_gruppo:"18",familiare:"19",membro_gruppo:"20"};
   try{
+    // ROSS 1000 richiede i codici delle Nazioni. La documentazione Alloggiati
+    // pubblica la tabella Stati come download ufficiale; "Nazioni" non è tra
+    // i valori previsti dall'operazione Tabella del Web Service.
+    nationCsv=await fetchOfficialDownload("Stati");
     if(process.env.ALLOGGIATI_USER&&process.env.ALLOGGIATI_PASSWORD&&process.env.ALLOGGIATI_WSKEY){
       const tok=await alloggiatiGenerateToken();
-      nationCsv=await alloggiatiTable(tok,"Nazioni");
       typeCsv=await alloggiatiTable(tok,"Tipi_Alloggiato");
     }
-  }catch(_e){}
+  }catch(_e){
+    try{
+      if(process.env.ALLOGGIATI_USER&&process.env.ALLOGGIATI_PASSWORD&&process.env.ALLOGGIATI_WSKEY){
+        const tok=await alloggiatiGenerateToken();
+        typeCsv=await alloggiatiTable(tok,"Tipi_Alloggiato");
+      }
+    }catch(_e2){}
+  }
   const codeOrValue=(v)=>{
     if(!v)return "";
     if(/^\d{6,9}$/.test(String(v).trim())) return String(v).trim();
@@ -446,9 +458,12 @@ async function rossSend(stay){
     const typeCode=typeCsv?findCode(typeCsv,typeName):(rossTypeCodes[guestType]||"16");
     const idcapo=(guestType==="familiare"||guestType==="membro_gruppo")?rossIds[0]:"";
     const cittadinanza=codeOrValue(g.cittadinanza_code||g.cittadinanza);
-    const statoResidenza=codeOrValue(g.residenza_stato_code||g.residenza_stato||g.cittadinanza);
+    const statoResidenza=codeOrValue(g.residenza_stato_code||g.residenza_stato||g.cittadinanza_code||g.cittadinanza);
     let luogoResidenza=String(g.residenza_luogo||"").trim();
-    if(!luogoResidenza && !/^100000100$/.test(statoResidenza)) luogoResidenza=String(g.cittadinanza||"").trim();
+    // Per gli stranieri ROSS consente una località estera testuale; se il
+    // gestionale non dispone ancora del campo residenza, usiamo il Paese di
+    // cittadinanza come fallback esplicito, evitando di inviare il campo vuoto.
+    if(!luogoResidenza && !/^100000100$/.test(statoResidenza)) luogoResidenza=countryToFull(g.cittadinanza)||"Non specificato";
     const comuneNascita=String(g.comune_nascita_code||g.luogo_nascita_code||"").trim();
     const statoNascita=codeOrValue(g.stato_nascita_code||g.stato_nascita||g.cittadinanza);
     return `<arrivo><idswh>${rossXmlEscape(rossIds[i])}</idswh><tipoalloggiato>${typeCode}</tipoalloggiato><idcapo>${rossXmlEscape(idcapo)}</idcapo><cognome>${rossXmlEscape(g.cognome)}</cognome><nome>${rossXmlEscape(g.nome)}</nome><sesso>${g.sesso||""}</sesso><cittadinanza>${rossXmlEscape(cittadinanza)}</cittadinanza><statoresidenza>${rossXmlEscape(statoResidenza)}</statoresidenza><luogoresidenza>${rossXmlEscape(statoResidenza==="100000100"?(g.residenza_luogo_code||luogoResidenza):luogoResidenza)}</luogoresidenza><datanascita>${yyyymmdd(g.nascita)}</datanascita><statonascita>${rossXmlEscape(statoNascita)}</statonascita><comunenascita>${rossXmlEscape(statoNascita==="100000100"?comuneNascita:"")}</comunenascita><tipoturismo>${rossXmlEscape(g.tipoturismo||tourism)}</tipoturismo><mezzotrasporto>${rossXmlEscape(g.mezzotrasporto||transport)}</mezzotrasporto><canaleprenotazione>${rossXmlEscape(g.canaleprenotazione||channel)}</canaleprenotazione><titolostudio>${rossXmlEscape(g.titolostudio||"")}</titolostudio><professione>${rossXmlEscape(g.professione||"")}</professione><esenzioneimposta>${rossXmlEscape(g.esenzioneimposta||"")}</esenzioneimposta></arrivo>`;
